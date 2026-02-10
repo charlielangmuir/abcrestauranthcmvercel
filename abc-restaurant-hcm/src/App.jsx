@@ -10,6 +10,9 @@ import EmployeesPage from './pages/EmployeesPage';
 import PayrollPage from './pages/PayrollPage';
 import ReimbursementsPage from './pages/ReimbursementsPage';
 import ProfilePage from './pages/ProfilePage';
+import ManagerProfile from './pages/ManagerProfile';
+import EmployeeProfile from './pages/EmployeeProfile';
+import ViewSchedule from './pages/ViewSchedule';
 
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
@@ -54,6 +57,9 @@ function App(){
 
                 <Route path="/reimbursements" element={<ReimbursementsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/manager-profile" element={<ManagerProfile />} />
+                <Route path="/employee-profile" element={<EmployeeProfile />} />
+                <Route path="/view-schedule" element={<ViewSchedule />} />
           </Route>
               
           <Route path="*" element={<div>Page Not Found</div>} />
