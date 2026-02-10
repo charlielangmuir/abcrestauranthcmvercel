@@ -27,15 +27,15 @@ const ProfilePage = () => {
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Member Since</span>
+                <span className="text-gray-600">Member Since: </span>
                 <span className="font-medium text-gray-900">Jan 2026</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Employee ID</span>
+                <span className="text-gray-600">Employee ID: </span>
                 <span className="font-medium text-gray-900">EMP-001</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Department</span>
+                <span className="text-gray-600">Department: </span>
                 <span className="font-medium text-gray-900">Kitchen</span>
               </div>
             </div>
