@@ -1,6 +1,6 @@
-// src/pages/EmployeesPage.jsx
 import { useState, useEffect } from 'react';
 import { employeeService } from '../api/employeeService';
+import EmployeeFormModal from '../components/employee/EmployeeFormModal';
 import toast from 'react-hot-toast';
 
 const EmployeesPage = () => {
@@ -9,15 +9,15 @@ const EmployeesPage = () => {
   const [refetching, setRefetching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  // Fetch employees on mount
   useEffect(() => {
     fetchEmployees();
   }, [showActiveOnly]);
 
   const fetchEmployees = async () => {
     try {
-      // Only show loading screen on initial load
       if (employees.length === 0) {
         setInitialLoading(true);
       } else {
@@ -45,7 +45,7 @@ const EmployeesPage = () => {
     try {
       await employeeService.deactivate(employeeId);
       toast.success(`${employeeName} has been deactivated`);
-      fetchEmployees(); // Refresh list
+      fetchEmployees();
     } catch (error) {
       console.error('Error deactivating employee:', error);
       toast.error('Failed to deactivate employee');
@@ -60,14 +60,32 @@ const EmployeesPage = () => {
     try {
       await employeeService.delete(employeeId);
       toast.success(`${employeeName} has been deleted`);
-      fetchEmployees(); // Refresh list
+      fetchEmployees();
     } catch (error) {
       console.error('Error deleting employee:', error);
       toast.error('Failed to delete employee');
     }
   };
 
-  // Filter employees based on search
+  const handleAddEmployee = () => {
+    setSelectedEmployee(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditEmployee = (employee) => {
+    setSelectedEmployee(employee);
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedEmployee(null);
+  };
+
+  const handleModalSuccess = () => {
+    fetchEmployees();
+  };
+
   const filteredEmployees = employees.filter(emp => {
     if (!searchQuery) return true;
     
@@ -85,7 +103,6 @@ const EmployeesPage = () => {
            employeeNumber.includes(search);
   });
 
-  // Calculate stats
   const stats = {
     total: employees.length,
     active: employees.filter(e => e.is_active).length,
@@ -129,13 +146,12 @@ const EmployeesPage = () => {
             fontWeight: 700,
             padding: '10px 16px',
           }}
-          onClick={() => toast('Add employee feature coming soon!')}
+          onClick={handleAddEmployee}
         >
           + Add Employee
         </button>
       </div>
 
-      {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
         <div className="card">
           <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 700 }}>Total Employees</div>
@@ -151,10 +167,8 @@ const EmployeesPage = () => {
         </div>
       </div>
 
-      {/* Search & Filters Card */}
       <div className="card">
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          {/* Search Input */}
           <input
             type="text"
             placeholder="Search by name, email, position, or department..."
@@ -208,7 +222,7 @@ const EmployeesPage = () => {
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: 100 }}>
                   Status
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: 160 }}>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: 160 }}>
                   Actions
                 </th>
               </tr>
@@ -273,7 +287,7 @@ const EmployeesPage = () => {
                           {employee.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'left' }}>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>
                         <button
                           type="button"
                           style={{
@@ -285,7 +299,7 @@ const EmployeesPage = () => {
                             cursor: 'pointer',
                             marginRight: 12,
                           }}
-                          onClick={() => toast('Edit feature coming soon!')}
+                          onClick={() => handleEditEmployee(employee)}
                         >
                           Edit
                         </button>
@@ -329,6 +343,13 @@ const EmployeesPage = () => {
           </table>
         </div>
       </div>
+
+      <EmployeeFormModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        employee={selectedEmployee}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };
