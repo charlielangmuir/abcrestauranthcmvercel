@@ -12,12 +12,19 @@ const MainLayout = () => {
 
   const role = (user?.user_metadata?.role || 'EMPLOYEE').toString().toUpperCase();
 
+  const profilePath = {
+  EMPLOYEE: '/employee-profile',
+  MANAGER: '/manager-profile',
+  FINANCE: '/manager-profile',
+  ADMIN: '/manager-profile'
+}[role];
+
   const navItems = useMemo(() => {
     const items = [
       { path: '/dashboard', icon: '📊', label: 'Dashboard' },
       { path: '/schedule', icon: '📅', label: 'Schedule' },
       { path: '/reimbursements', icon: '💰', label: 'Reimbursements' },
-      { path: '/profile', icon: '👤', label: 'Profile' },
+      { path: profilePath, icon: '👤', label: 'Profile' },
     ];
 
     if (role === 'MANAGER' || role === 'ADMIN') {
