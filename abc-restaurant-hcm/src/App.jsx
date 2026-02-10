@@ -17,43 +17,40 @@ import ViewSchedule from './pages/ViewSchedule';
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
 
-function App(){
+function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Toaster position="top-right" />
         <Routes>
-          
+          {/* Auth routes */}
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
 
-
-          <Route 
-            element={<ProtectedRoute><MainLayout /></ProtectedRoute>}> 
-            
+          {/* Protected app routes */}
+          <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/schedule" element={<SchedulePage />} />
 
+            <Route
+              path="/employees"
+              element={
+                <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+                  <EmployeesPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
-                  path="/employees"
-                  element={
-                    <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
-                      <EmployeesPage />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                <Route
-                  path="/payroll"
-                  element={
-                    <ProtectedRoute allowedRoles={['MANAGER', 'FINANCE', 'ADMIN']}>
-                      <PayrollPage />
-                    </ProtectedRoute>
-                  }
-                />
+              path="/payroll"
+              element={
+                <ProtectedRoute allowedRoles={['MANAGER', 'FINANCE', 'ADMIN']}>
+                  <PayrollPage />
+                </ProtectedRoute>
+              }
+            />
 
                 <Route path="/reimbursements" element={<ReimbursementsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
@@ -61,8 +58,9 @@ function App(){
                 <Route path="/employee-profile" element={<EmployeeProfile />} />
                 <Route path="/view-schedule" element={<ViewSchedule />} />
           </Route>
-              
-          <Route path="*" element={<div>Page Not Found</div>} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
