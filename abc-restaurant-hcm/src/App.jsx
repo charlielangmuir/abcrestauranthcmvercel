@@ -20,6 +20,7 @@ function App(){
       <BrowserRouter>
         <Toaster position="top-right" />
         <Routes>
+          
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
