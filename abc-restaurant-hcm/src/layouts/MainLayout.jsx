@@ -18,11 +18,17 @@ const MainLayout = () => {
   FINANCE: '/manager-profile',
   ADMIN: '/manager-profile'
 }[role];
+const schedulePath = {
+  EMPLOYEE: '/view-schedule',
+  MANAGER: '/schedule',
+  FINANCE: '/view-schedule',
+  ADMIN: '/schedule'
+}[role];
 
   const navItems = useMemo(() => {
     const items = [
       { path: '/dashboard', icon: '📊', label: 'Dashboard' },
-      { path: '/schedule', icon: '📅', label: 'Schedule' },
+      { path: schedulePath, icon: '📅', label: 'Schedule' },
       { path: '/reimbursements', icon: '💰', label: 'Reimbursements' },
       { path: profilePath, icon: '👤', label: 'Profile' },
     ];
