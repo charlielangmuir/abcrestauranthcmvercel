@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { employeeService } from '../api/employeeService';
 import { shiftService } from '../api/shiftService';
 import toast from 'react-hot-toast';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const SchedulePage = () => {
   const getWeekDates = (date) => {
@@ -216,7 +217,7 @@ const SchedulePage = () => {
           className="iconBtn"
           onClick={() => toast.info('Auto-generate feature coming soon')}
         >
-          🤖 Auto-Generate Schedule
+          <FontAwesomeIcon icon="fa-solid fa-robot" /> Auto-Generate Schedule
         </button>
       </div>
 
@@ -371,7 +372,6 @@ const SchedulePage = () => {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
               <div className="subtle">No shifts scheduled for this day</div>
               <div className="subtle" style={{ fontSize: 12, marginTop: 4 }}>
                 Click "Add Shift" to schedule employees
@@ -381,7 +381,7 @@ const SchedulePage = () => {
         </div>
       ) : (
         <div className="card" style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
+          <div style={{ fontSize: 48, marginBottom: 12 }}><FontAwesomeIcon icon="fa-solid fa-calendar" /></div>
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
             Select a day to view and manage shifts
           </div>

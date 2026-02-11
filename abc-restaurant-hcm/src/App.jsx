@@ -13,6 +13,7 @@ import ProfilePage from './pages/ProfilePage';
 import ManagerProfile from './pages/ManagerProfile';
 import EmployeeProfile from './pages/EmployeeProfile';
 import ViewSchedule from './pages/ViewSchedule';
+import './fontawesome';
 
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';

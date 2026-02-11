@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dashboardService } from '../api/dashboardService';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -53,25 +54,25 @@ const DashboardPage = () => {
       title: 'Upcoming Shifts', 
       value: loading ? '...' : stats.upcomingShifts, 
       subtitle: 'Next 7 days', 
-      icon: '📅' 
+      icon: <FontAwesomeIcon icon="fa-solid fa-calendar" /> 
     },
     { 
       title: 'Hours This Week', 
       value: loading ? '...' : stats.hoursThisWeek, 
       subtitle: 'Mon–Sun', 
-      icon: '⏱️' 
+      icon: <FontAwesomeIcon icon="fa-solid fa-clock" /> 
     },
     { 
       title: 'Pending Requests', 
       value: loading ? '...' : stats.pendingRequests, 
       subtitle: 'Awaiting approval', 
-      icon: '📝' 
+      icon: <FontAwesomeIcon icon="fa-solid fa-file-alt" /> 
     },
     { 
       title: 'Unread Notifications', 
       value: loading ? '...' : stats.unreadNotifications, 
       subtitle: 'New updates', 
-      icon: '🔔' 
+      icon: <FontAwesomeIcon icon="fa-solid fa-bell" /> 
     },
   ];
 
