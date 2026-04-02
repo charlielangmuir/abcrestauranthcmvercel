@@ -100,17 +100,22 @@ export const dashboardService = {
       const weekEndStr = formatDate(weekEnd);
 
       let upcomingShifts = 0;
+      let upcomingShiftList = [];
       try {
-        const { error: upcomingError, count } = await supabase
+        const { data: upcomingData, error: upcomingError, count } = await supabase
           .from('shifts')
           .select('*', { count: 'exact' })
           .eq('employee_id', employeeId)
           .gte('shift_date', todayStr)
           .lte('shift_date', nextWeekStr)
-          .eq('status', 'scheduled');
+          .eq('status', 'scheduled')
+          .order('shift_date', { ascending: true })
+          .order('start_time', { ascending: true })
+          .limit(5);
 
         if (!upcomingError) {
           upcomingShifts = count || 0;
+          upcomingShiftList = upcomingData || [];
         }
       } catch (error) {
         console.warn('Shifts table may not exist yet');
@@ -164,15 +169,20 @@ export const dashboardService = {
         console.warn('Notifications table may not exist yet');
       }
 
+      const lastWeek = new Date(today);
+      lastWeek.setDate(lastWeek.getDate() - 7);
+      const lastWeekStr = formatDate(lastWeek);
+
       let recentShifts = [];
       try {
         const { data: shiftsData, error: shiftsError } = await supabase
           .from('shifts')
           .select('*')
           .eq('employee_id', employeeId)
-          .gte('shift_date', weekStartStr)
-          .order('shift_date', { ascending: true })
-          .order('start_time', { ascending: true })
+          .gte('shift_date', lastWeekStr)
+          .lte('shift_date', todayStr)
+          .order('shift_date', { ascending: false })
+          .order('start_time', { ascending: false })
           .limit(5);
 
         if (!shiftsError && shiftsData) {
@@ -184,6 +194,7 @@ export const dashboardService = {
 
       return {
         upcomingShifts,
+        upcomingShiftList,
         hoursThisWeek: Math.round(hoursThisWeek * 10) / 10,
         pendingRequests,
         unreadNotifications,

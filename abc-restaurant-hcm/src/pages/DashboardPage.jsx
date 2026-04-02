@@ -124,12 +124,6 @@ const DashboardPage = () => {
 
   const statCards = [
     {
-      title: 'Upcoming Shifts',
-      value: loading ? '...' : stats.upcomingShifts,
-      subtitle: 'Next 7 days',
-      icon: <FontAwesomeIcon icon="fa-solid fa-calendar" />
-    },
-    {
       title: 'Hours This Week',
       value: loading ? '...' : stats.hoursThisWeek,
       subtitle: 'Mon–Sun',
@@ -184,17 +178,10 @@ const DashboardPage = () => {
   };
 
   return (
-    <div className="container" style={{ paddingTop: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <h1 className="pageTitle">Dashboard</h1>
-          <p className="subtle">{today} • {role}</p>
-        </div>
-
-        <div className="card" style={{ padding: 12, minWidth: 260 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Signed in as</div>
-          <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>{user?.email || '—'}</div>
-        </div>
+    <div className="container" style={{ paddingTop: 10, maxWidth: 1200, margin: '0 auto' }}>
+      <div>
+        <h1 className="pageTitle">Dashboard</h1>
+        <p className="subtle">{today} • {role}</p>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -204,7 +191,7 @@ const DashboardPage = () => {
               Welcome back{user?.email ? `, ${user.email}` : ''}!
             </div>
             <div className="subtle" style={{ marginTop: 4 }}>
-              Here's a quick overview of your schedule and requests.
+              Here's your schedule and attendance summary.
             </div>
           </div>
 
@@ -212,7 +199,7 @@ const DashboardPage = () => {
             <button
               type="button"
               className="iconBtn"
-              onClick={() => window.location.assign('/view-schedule')}
+              onClick={() => window.location.assign(role === 'Admin' || role === 'Manager' ? '/schedule' : '/view-schedule')}
               title="Go to schedule"
             >
               View Schedule
@@ -229,76 +216,57 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>Attendance</div>
-            <div className="subtle" style={{ marginTop: 4 }}>
-              Track your active work session from the dashboard.
+      <div className="card" style={{ marginTop: 12, padding: '12px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={{ fontSize: 15, fontWeight: 900 }}>Attendance</div>
+            <div className="subtle" style={{ marginTop: 3, fontSize: 13 }}>
+              Track your work session.
             </div>
 
-            <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
               <div
                 style={{
-                  padding: '12px',
+                  padding: '14px',
                   border: '1px solid var(--border, #ddd)',
                   borderRadius: 8,
                   background: isClockedIn ? 'var(--primary-bg, #eff6ff)' : 'transparent',
+                  transition: 'all 0.2s ease'
                 }}
               >
-                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Current Status</div>
-                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
-                  {isClockedIn ? 'On Shift' : 'Off Shift'}
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+                <div style={{ fontSize: 18, fontWeight: 900, marginTop: 6, color: isClockedIn ? '#228B22' : '#666' }}>
+                  {isClockedIn ? '● On Shift' : '◯ Off Shift'}
                 </div>
+                {isClockedIn && activeClockEntry?.clock_in && (
+                  <div className="subtle" style={{ fontSize: 11, marginTop: 6 }}>
+                    Started {formatDateTime(activeClockEntry.clock_in)}
+                  </div>
+                )}
+                {!isClockedIn && lastClockOut && (
+                  <div className="subtle" style={{ fontSize: 11, marginTop: 6 }}>
+                    Last ended {formatTimeOnly(lastClockOut)}
+                  </div>
+                )}
               </div>
 
               <div
                 style={{
-                  padding: '12px',
+                  padding: '14px',
                   border: '1px solid var(--border, #ddd)',
                   borderRadius: 8,
+                  transition: 'all 0.2s ease'
                 }}
               >
-                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Clocked In At</div>
-                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
-                  {isClockedIn && activeClockEntry?.clock_in
-                    ? formatTimeOnly(activeClockEntry.clock_in)
-                    : '—'}
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Elapsed</div>
+                <div style={{ fontSize: 18, fontWeight: 900, marginTop: 6 }}>
+                  {isClockedIn ? (elapsedTime || '—') : '—'}
                 </div>
-              </div>
-
-              <div
-                style={{
-                  padding: '12px',
-                  border: '1px solid var(--border, #ddd)',
-                  borderRadius: 8,
-                }}
-              >
-                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Time Since Clock In</div>
-                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
-                  {isClockedIn ? (elapsedTime || '0m') : '—'}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: '12px',
-                  border: '1px solid var(--border, #ddd)',
-                  borderRadius: 8,
-                }}
-              >
-                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Last Clock Out</div>
-                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
-                  {lastClockOut ? formatTimeOnly(lastClockOut) : '—'}
+                <div className="subtle" style={{ fontSize: 11, marginTop: 6 }}>
+                  {isClockedIn ? 'Time on shift' : 'Not active'}
                 </div>
               </div>
             </div>
-
-            {isClockedIn && activeClockEntry?.clock_in && (
-              <div className="subtle" style={{ marginTop: 10, fontSize: 12 }}>
-                Active session started {formatDateTime(activeClockEntry.clock_in)}.
-              </div>
-            )}
           </div>
 
           <div style={{ minWidth: 220, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
@@ -311,9 +279,12 @@ const DashboardPage = () => {
               style={{
                 minHeight: 44,
                 fontWeight: 800,
+                background: isClockedIn ? '#dc2626' : '#228B22',
+                color: 'white',
+                border: 'none'
               }}
             >
-              {clockLoading ? 'Processing...' : isClockedIn ? 'End Shift' : 'Start Shift'}
+              {clockLoading ? 'Processing...' : isClockedIn ? '⊠ End Shift' : '▶ Start Shift'}
             </button>
 
             <div
@@ -327,17 +298,17 @@ const DashboardPage = () => {
               }}
             >
               {isClockedIn
-                ? 'You are currently on an active shift. End your shift when your work session is complete.'
-                : 'You are not currently on an active shift. Start your shift when you begin working.'}
+                ? 'Active shift in progress'
+                : 'No active shift'}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid4" style={{ marginTop: 16 }}>
+      <div className="grid4" style={{ marginTop: 12, alignItems: 'stretch', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
         {statCards.map((s) => (
-          <div key={s.title} className="card">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div key={s.title} className="card" style={{ minHeight: 130, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flex: 1 }}>
               <div>
                 <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 700 }}>{s.title}</div>
                 <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8 }}>{s.value}</div>
@@ -349,14 +320,14 @@ const DashboardPage = () => {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-        <div className="card">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginTop: 16, alignItems: 'stretch' }}>
+        <div className="card" style={{ height: '100%', minHeight: '220px', maxHeight: '220px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 900 }}>Recent Shifts</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>This Week</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Last 7 days</div>
           </div>
 
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 10, flex: 1, overflowY: 'auto' }}>
             {loading ? (
               <div className="subtle">Loading shifts...</div>
             ) : stats.recentShifts && stats.recentShifts.length > 0 ? (
@@ -389,12 +360,56 @@ const DashboardPage = () => {
                 ))}
               </div>
             ) : (
-              <div className="subtle">No shifts assigned yet.</div>
+              <div className="subtle">No recent shifts yet.</div>
             )}
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" style={{ height: '100%', minHeight: '220px', maxHeight: '220px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 900 }}>Upcoming Shifts</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Next 7 days</div>
+          </div>
+
+          <div style={{ marginTop: 10, flex: 1, overflowY: 'auto' }}>
+            {loading ? (
+              <div className="subtle">Loading shifts...</div>
+            ) : stats.upcomingShiftList && stats.upcomingShiftList.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {stats.upcomingShiftList.map((shift) => (
+                  <div
+                    key={shift.shift_id}
+                    style={{
+                      padding: '10px 12px',
+                      border: '1px solid var(--border, #ddd)',
+                      borderRadius: 6,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>
+                        {formatShiftDate(shift.shift_date)}
+                      </div>
+                      <div className="subtle" style={{ fontSize: 12, marginTop: 2 }}>
+                        {shift.position || 'Shift'}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>
+                      {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="subtle">No upcoming shifts in the next week.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="card" style={{ height: '100%', minHeight: '220px', maxHeight: '220px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 900 }}>Requests</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pending</div>

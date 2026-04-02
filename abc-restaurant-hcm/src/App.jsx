@@ -11,6 +11,7 @@ import PayrollPage from './pages/PayrollPage';
 import ReimbursementsPage from './pages/ReimbursementsPage';
 import ProfilePage from './pages/ProfilePage';
 import ViewSchedule from './pages/ViewSchedule';
+import AvailabilityPage from './pages/AvailabilityPage';
 import './fontawesome';
 
 import MainLayout from './layouts/MainLayout';
@@ -30,6 +31,7 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/schedule" element={<SchedulePage />} />
+            <Route path="/availability" element={<AvailabilityPage />} />
 
             <Route
               path="/employees"

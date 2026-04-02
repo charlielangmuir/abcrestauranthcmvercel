@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { employeeService } from '../api/employeeService';
 import { shiftService } from '../api/shiftService';
+import { employeeAvailabilityService } from '../api/employeeAvailabilityService';
+import { supabase } from '../api/supabaseClient';
 import toast from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
@@ -28,6 +30,10 @@ const SchedulePage = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [pendingShift, setPendingShift] = useState(null);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictInfo, setConflictInfo] = useState(null);
+  const [overrideReason, setOverrideReason] = useState('');
 
   const weekDates = useMemo(() => getWeekDates(selectedWeek), [selectedWeek]);
 
@@ -117,6 +123,121 @@ const SchedulePage = () => {
     });
   };
 
+  const timeToMinutes = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const rangesOverlap = (startA, endA, startB, endB) => {
+    return timeToMinutes(startA) < timeToMinutes(endB) && timeToMinutes(startB) < timeToMinutes(endA);
+  };
+
+  const checkShiftConflict = async (employeeId, shiftDate, startTime, endTime) => {
+    try {
+      // Check if employee is inactive
+      const employee = employees.find(e => e.employee_id === employeeId);
+      if (!employee) {
+        return { type: 'hard', message: 'Cannot schedule: Employee record not found' };
+      }
+
+      const isActive =
+        employee.is_active === true ||
+        employee.is_active === 'true' ||
+        employee.status === 'active' ||
+        employee.status === 'ACTIVE';
+
+      if (!isActive) {
+        return { type: 'soft', message: '⚠️ Employee is marked as inactive. Scheduling anyway will override this status.' };
+      }
+
+      // Check for approved time-off on that date
+      const { data: timeOff } = await supabase
+        .from('time_off_requests')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('status', 'approved')
+        .lte('start_date', shiftDate)
+        .gte('end_date', shiftDate);
+
+      if (timeOff && timeOff.length > 0) {
+        return { type: 'hard', message: 'Cannot schedule: Employee has approved time-off' };
+      }
+
+      // Check for overlapping shifts
+      const { data: overlapping } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('shift_date', shiftDate)
+        .neq('status', 'cancelled');
+
+      if (overlapping && overlapping.length > 0) {
+        const hasOverlap = overlapping.some(shift => 
+          rangesOverlap(startTime, endTime, shift.start_time, shift.end_time)
+        );
+        if (hasOverlap) {
+          return { type: 'hard', message: 'Cannot schedule: Employee already has overlapping shift' };
+        }
+      }
+
+      // Check employee availability preference
+      const dayOfWeekMap = { 0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday' };
+      const date = new Date(shiftDate);
+      const dayOfWeek = date.getDay();
+      const dayName = dayOfWeekMap[dayOfWeek];
+
+      const availability = await employeeAvailabilityService.getAvailabilityByEmployeeId(employeeId);
+      console.log('Availability for employee', employeeId, 'on', dayName, ':', availability[dayName]);
+      if (availability[dayName]) {
+        const dayAvail = availability[dayName];
+        
+        if (!dayAvail.available) {
+          console.log('Soft conflict: unavailable on', dayName);
+          return { 
+            type: 'soft', 
+            message: `⚠️ Employee marked as unavailable on ${dayName}. Scheduling anyway will override their preference.` 
+          };
+        }
+
+        if (dayAvail.available && (timeToMinutes(startTime) < timeToMinutes(dayAvail.startTime) || timeToMinutes(endTime) > timeToMinutes(dayAvail.endTime))) {
+          console.log('Soft conflict: time outside availability');
+          return { 
+            type: 'soft', 
+            message: `⚠️ Shift time (${startTime}-${endTime}) is outside employee's availability (${dayAvail.startTime}-${dayAvail.endTime})` 
+          };
+        }
+      } else {
+        console.log('No availability set for', dayName, 'skipping availability check');
+      }
+
+      return { type: 'none' };
+    } catch (error) {
+      console.error('Error checking conflict:', error);
+      return { type: 'none' };
+    }
+  };
+
+  const completeShiftCreation = async (shiftData) => {
+    try {
+      const newShift = await shiftService.create(shiftData);
+      
+      const dateKey = getDateKey(selectedDay);
+      setShifts(prev => ({
+        ...prev,
+        [dateKey]: [...(prev[dateKey] || []), newShift],
+      }));
+
+      setShowAddShift(false);
+      setShowConflictModal(false);
+      setPendingShift(null);
+      setOverrideReason('');
+      toast.success('Shift added successfully');
+    } catch (error) {
+      console.error('Error adding shift:', error);
+      toast.error(error.message || 'Failed to add shift');
+    }
+  };
+
   const formatDayName = (date) => {
     return date.toLocaleDateString(undefined, { weekday: 'short' });
   };
@@ -134,31 +255,35 @@ const SchedulePage = () => {
     if (!selectedDay) return;
 
     try {
+      const shiftDate = formatDateForDB(selectedDay);
+      const conflict = await checkShiftConflict(employeeId, shiftDate, startTime, endTime);
+
+      if (conflict.type === 'hard') {
+        toast.error(conflict.message);
+        return;
+      }
+
+      if (conflict.type === 'soft') {
+        // Manager receives this alert message and can override with reason
+        toast('⚠️ ' + conflict.message, { icon: '⚠️' });
+        setPendingShift({ employeeId, startTime, endTime });
+        setConflictInfo(conflict.message);
+        setShowConflictModal(true);
+        return;
+      }
+
       const shiftData = {
         employee_id: employeeId,
-        shift_date: formatDateForDB(selectedDay),
+        shift_date: shiftDate,
         start_time: startTime,
         end_time: endTime,
         status: 'scheduled',
       };
 
-      const newShift = await shiftService.create(shiftData);
-      
-      const dateKey = getDateKey(selectedDay);
-      setShifts(prev => ({
-        ...prev,
-        [dateKey]: [...(prev[dateKey] || []), newShift],
-      }));
-
-      setShowAddShift(false);
-      toast.success('Shift added successfully');
+      await completeShiftCreation(shiftData);
     } catch (error) {
       console.error('Error adding shift:', error);
-      if (error.message?.includes('does not exist')) {
-        toast.error('Schedule system is not set up yet. Please contact your administrator.');
-      } else {
-        toast.error(error.message || 'Failed to add shift');
-      }
+      toast.error('Failed to add shift');
     }
   };
 
@@ -403,6 +528,31 @@ const SchedulePage = () => {
         />
       )}
 
+      {showConflictModal && pendingShift && (
+        <ConflictModal
+          conflictMessage={conflictInfo}
+          overrideReason={overrideReason}
+          onReasonChange={setOverrideReason}
+          onConfirm={async () => {
+            const shiftData = {
+              employee_id: pendingShift.employeeId,
+              shift_date: formatDateForDB(selectedDay),
+              start_time: pendingShift.startTime,
+              end_time: pendingShift.endTime,
+              status: 'scheduled',
+              notes: overrideReason
+            };
+            await completeShiftCreation(shiftData);
+          }}
+          onCancel={() => {
+            setShowConflictModal(false);
+            setPendingShift(null);
+            setOverrideReason('');
+            setConflictInfo(null);
+          }}
+        />
+      )}
+
       <style>{`
         @media (max-width: 900px) {
           .container > div[style*="grid-template-columns: repeat(7, 1fr)"] {
@@ -593,6 +743,120 @@ const AddShiftModal = ({ employees, onAdd, onClose }) => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+const ConflictModal = ({ conflictMessage, overrideReason, onReasonChange, onConfirm, onCancel }) => {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1001,
+        padding: 20,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        className="card"
+        style={{ maxWidth: 500, width: '100%' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ fontSize: 18, fontWeight: 900 }}>Scheduling Conflict</div>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 24,
+              cursor: 'pointer',
+              color: 'var(--muted)',
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ marginBottom: 16, padding: 12, background: '#fff3cd', borderRadius: 6, border: '1px solid #ffc107' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#856404' }}>
+            {conflictMessage}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{
+            display: 'block',
+            fontSize: 13,
+            fontWeight: 700,
+            color: 'var(--muted)',
+            marginBottom: 6,
+          }}>
+            Override Reason (optional)
+          </label>
+          <textarea
+            value={overrideReason}
+            onChange={(e) => onReasonChange(e.target.value)}
+            placeholder="Explain why you're scheduling this shift despite the conflict..."
+            style={{
+              width: '100%',
+              minHeight: 100,
+              padding: '10px 12px',
+              fontSize: 14,
+              border: '1px solid var(--border, #ddd)',
+              borderRadius: 6,
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              fontSize: 14,
+              fontWeight: 700,
+              background: 'transparent',
+              border: '1px solid var(--border, #ddd)',
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              fontSize: 14,
+              fontWeight: 700,
+              background: '#228B22',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+          >
+            Schedule Anyway
+          </button>
+        </div>
       </div>
     </div>
   );

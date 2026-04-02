@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { dashboardService } from '../api/dashboardService';
 import toast from 'react-hot-toast';
 
 const ViewSchedule = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState([]);
   const [shifts, setShifts] = useState([]);
@@ -110,6 +112,21 @@ const ViewSchedule = () => {
     return timeStr.substring(0, 5);
   };
 
+  const getNextShift = () => {
+    const today = new Date();
+    const todayStr = formatDateForDB(today);
+    const futureShifts = shifts
+      .filter(s => s.shift_date >= todayStr)
+      .sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time));
+    return futureShifts.length > 0 ? futureShifts[0] : null;
+  };
+
+  const countShiftsInMonth = () => {
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    return shifts.filter(s => s.shift_date.startsWith(`${year}-${month}`)).length;
+  };
+
   const hasShift = (date) => {
     if (!date) return false;
     const dateStr = formatDateForDB(date);
@@ -207,7 +224,22 @@ const ViewSchedule = () => {
 
                 <div className="schedule-detail-item">
                   <p className="schedule-detail-text">
-                    <span className="schedule-detail-label">Your shift:</span> {loading ? 'Loading...' : getTodayShift()}
+                    <span className="schedule-detail-label">Your shift today:</span> {loading ? 'Loading...' : getTodayShift()}
+                  </p>
+                </div>
+
+                <div className="schedule-detail-item">
+                  <p className="schedule-detail-text">
+                    <span className="schedule-detail-label">Next shift:</span> {loading ? 'Loading...' : (() => {
+                      const nextShift = getNextShift();
+                      return nextShift ? `${formatDate(new Date(nextShift.shift_date))} ${formatTime(nextShift.start_time)}-${formatTime(nextShift.end_time)}${nextShift.position ? ` (${nextShift.position})` : ''}` : 'No upcoming shifts';
+                    })()}
+                  </p>
+                </div>
+
+                <div className="schedule-detail-item">
+                  <p className="schedule-detail-text">
+                    <span className="schedule-detail-label">Shifts this month:</span> {loading ? '...' : countShiftsInMonth()}
                   </p>
                 </div>
               </div>
@@ -216,7 +248,7 @@ const ViewSchedule = () => {
             <div className="schedule-calendar-section">
               <div className="schedule-calendar-header">
                 <h2 className="schedule-calendar-title">
-                  {monthNames[currentDate.getMonth()]}
+                  {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
                 </h2>
                 <div className="schedule-calendar-nav">
                   <button
@@ -306,7 +338,7 @@ const ViewSchedule = () => {
                 </button>
                 <button 
                   className="schedule-action-btn"
-                  onClick={() => toast.info('Availability feature coming soon')}
+                  onClick={() => navigate('/availability')}
                 >
                   Check Availability
                 </button>
@@ -326,32 +358,79 @@ const ViewSchedule = () => {
       )}
 
       <style>{`
+        .schedule-page {
+          background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        }
+
+        .schedule-content-card {
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
         .schedule-day-shift {
-          background-color: #228B22 !important;
+          background: linear-gradient(135deg, #228B22 0%, #1a6b1a 100%) !important;
           color: white !important;
           font-weight: 700;
+          box-shadow: 0 1px 4px rgba(34, 139, 34, 0.2);
+          transition: all 0.2s ease;
         }
 
         .schedule-day-shift:hover {
-          background-color: #1a6b1a !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(34, 139, 34, 0.3);
         }
 
         .schedule-day-timeoff {
           background-color: #F5DEB3 !important;
           color: #8B4513 !important;
           font-weight: 700;
+          box-shadow: 0 1px 3px rgba(139, 69, 19, 0.1);
+          transition: all 0.2s ease;
         }
 
         .schedule-day-timeoff:hover {
-          background-color: #dbc79e !important;
+          background-color: #E8D4A0 !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px rgba(139, 69, 19, 0.15);
+        }
+
+        .schedule-day-current {
+          transition: all 0.2s ease;
         }
 
         .schedule-day-current:hover {
           background-color: #f3f4f6 !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .schedule-day-today {
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
         }
 
         .schedule-day-today:hover {
-          background-color: #2563eb !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+        }
+
+        .schedule-calendar-grid {
+          transition: gap 0.3s ease;
+        }
+
+        .schedule-action-buttons {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .schedule-action-btn {
+          flex: 1;
+          min-width: 140px;
+          transition: all 0.2s ease;
+        }
+
+        .schedule-action-btn:hover {
+          transform: translateY(-1px);
         }
       `}</style>
     </div>
