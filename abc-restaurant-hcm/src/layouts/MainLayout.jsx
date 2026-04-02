@@ -7,23 +7,18 @@ const MainLayout = () => {
   const { user } = useAuth();
   const location = useLocation();
 
-  // Start closed so it behaves like a drawer
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const role = (user?.user_metadata?.role || 'EMPLOYEE').toString().toUpperCase();
 
-  const profilePath = {
-  EMPLOYEE: '/employee-profile',
-  MANAGER: '/manager-profile',
-  FINANCE: '/manager-profile',
-  ADMIN: '/manager-profile'
-}[role];
-const schedulePath = {
-  EMPLOYEE: '/view-schedule',
-  MANAGER: '/schedule',
-  FINANCE: '/view-schedule',
-  ADMIN: '/schedule'
-}[role];
+  const profilePath = '/profile';
+
+  const schedulePath = {
+    EMPLOYEE: '/view-schedule',
+    MANAGER: '/schedule',
+    FINANCE: '/view-schedule',
+    ADMIN: '/schedule'
+  }[role];
 
   const navItems = useMemo(() => {
     const items = [
@@ -43,7 +38,7 @@ const schedulePath = {
     }
 
     return items;
-  }, [role]);
+  }, [role, schedulePath, profilePath]);
 
   const isActive = (path) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
@@ -54,15 +49,18 @@ const schedulePath = {
     <div className="appShell">
       <Navbar toggleSidebar={() => setSidebarOpen((v) => !v)} />
 
-      {/* Overlay (only shown when open on small screens) */}
       {sidebarOpen && <div className="sidebarOverlay" onClick={closeSidebar} />}
 
       <div className="shellBody">
-        {/* Drawer sidebar */}
         <aside className={`sidebarDrawer ${sidebarOpen ? 'sidebarDrawerOpen' : ''}`}>
           <div className="sidebarHeader">
             <div style={{ fontWeight: 900 }}>Menu</div>
-            <button type="button" className="closeBtn" onClick={closeSidebar} aria-label="Close menu">
+            <button
+              type="button"
+              className="closeBtn"
+              onClick={closeSidebar}
+              aria-label="Close menu"
+            >
               ✕
             </button>
           </div>
@@ -86,7 +84,6 @@ const schedulePath = {
           </div>
         </aside>
 
-        {/* Main content */}
         <main className="content">
           <Outlet />
         </main>

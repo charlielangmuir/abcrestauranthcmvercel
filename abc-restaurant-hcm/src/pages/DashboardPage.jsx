@@ -13,6 +13,11 @@ const DashboardPage = () => {
     recentShifts: [],
   });
   const [loading, setLoading] = useState(true);
+  const [clockLoading, setClockLoading] = useState(false);
+  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [activeClockEntry, setActiveClockEntry] = useState(null);
+  const [lastClockOut, setLastClockOut] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState('');
 
   const role = useMemo(() => {
     const r = (user?.user_metadata?.role || 'EMPLOYEE').toString().toUpperCase();
@@ -34,8 +39,42 @@ const DashboardPage = () => {
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
+      fetchClockStatus();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!isClockedIn || !activeClockEntry?.clock_in) {
+      setElapsedTime('');
+      return;
+    }
+
+    const updateElapsedTime = () => {
+      const clockInTime = new Date(activeClockEntry.clock_in);
+      const now = new Date();
+      const diffMs = now - clockInTime;
+
+      if (diffMs < 0) {
+        setElapsedTime('0m');
+        return;
+      }
+
+      const totalMinutes = Math.floor(diffMs / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+
+      if (hours > 0) {
+        setElapsedTime(`${hours}h ${minutes}m`);
+      } else {
+        setElapsedTime(`${minutes}m`);
+      }
+    };
+
+    updateElapsedTime();
+    const interval = setInterval(updateElapsedTime, 60000);
+
+    return () => clearInterval(interval);
+  }, [isClockedIn, activeClockEntry]);
 
   const fetchDashboardData = async () => {
     try {
@@ -49,30 +88,64 @@ const DashboardPage = () => {
     }
   };
 
+  const fetchClockStatus = async () => {
+    try {
+      const data = await dashboardService.getClockStatus(user.id);
+      setIsClockedIn(data.isClockedIn);
+      setActiveClockEntry(data.activeEntry || null);
+      setLastClockOut(data.lastClockOut || null);
+    } catch (error) {
+      console.error('Error fetching clock status:', error);
+    }
+  };
+
+  const handleClockAction = async () => {
+    try {
+      setClockLoading(true);
+
+      const result = isClockedIn
+        ? await dashboardService.clockOut(user.id)
+        : await dashboardService.clockIn(user.id);
+
+      if (!result.success) {
+        alert(result.message || 'Unable to complete action.');
+        return;
+      }
+
+      await fetchClockStatus();
+      await fetchDashboardData();
+    } catch (error) {
+      console.error('Error handling clock action:', error);
+      alert('Something went wrong.');
+    } finally {
+      setClockLoading(false);
+    }
+  };
+
   const statCards = [
-    { 
-      title: 'Upcoming Shifts', 
-      value: loading ? '...' : stats.upcomingShifts, 
-      subtitle: 'Next 7 days', 
-      icon: <FontAwesomeIcon icon="fa-solid fa-calendar" /> 
+    {
+      title: 'Upcoming Shifts',
+      value: loading ? '...' : stats.upcomingShifts,
+      subtitle: 'Next 7 days',
+      icon: <FontAwesomeIcon icon="fa-solid fa-calendar" />
     },
-    { 
-      title: 'Hours This Week', 
-      value: loading ? '...' : stats.hoursThisWeek, 
-      subtitle: 'Mon–Sun', 
-      icon: <FontAwesomeIcon icon="fa-solid fa-clock" /> 
+    {
+      title: 'Hours This Week',
+      value: loading ? '...' : stats.hoursThisWeek,
+      subtitle: 'Mon–Sun',
+      icon: <FontAwesomeIcon icon="fa-solid fa-clock" />
     },
-    { 
-      title: 'Pending Requests', 
-      value: loading ? '...' : stats.pendingRequests, 
-      subtitle: 'Awaiting approval', 
-      icon: <FontAwesomeIcon icon="fa-solid fa-file-alt" /> 
+    {
+      title: 'Pending Requests',
+      value: loading ? '...' : stats.pendingRequests,
+      subtitle: 'Awaiting approval',
+      icon: <FontAwesomeIcon icon="fa-solid fa-file-alt" />
     },
-    { 
-      title: 'Unread Notifications', 
-      value: loading ? '...' : stats.unreadNotifications, 
-      subtitle: 'New updates', 
-      icon: <FontAwesomeIcon icon="fa-solid fa-bell" /> 
+    {
+      title: 'Unread Notifications',
+      value: loading ? '...' : stats.unreadNotifications,
+      subtitle: 'New updates',
+      icon: <FontAwesomeIcon icon="fa-solid fa-bell" />
     },
   ];
 
@@ -87,6 +160,27 @@ const DashboardPage = () => {
 
   const formatTime = (timeStr) => {
     return timeStr.substring(0, 5);
+  };
+
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return '—';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  const formatTimeOnly = (dateTimeStr) => {
+    if (!dateTimeStr) return '—';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   return (
@@ -104,7 +198,7 @@ const DashboardPage = () => {
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 900 }}>
               Welcome back{user?.email ? `, ${user.email}` : ''}!
@@ -114,7 +208,7 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button
               type="button"
               className="iconBtn"
@@ -131,6 +225,111 @@ const DashboardPage = () => {
             >
               Reimbursements
             </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div style={{ fontSize: 16, fontWeight: 900 }}>Attendance</div>
+            <div className="subtle" style={{ marginTop: 4 }}>
+              Track your active work session from the dashboard.
+            </div>
+
+            <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              <div
+                style={{
+                  padding: '12px',
+                  border: '1px solid var(--border, #ddd)',
+                  borderRadius: 8,
+                  background: isClockedIn ? 'var(--primary-bg, #eff6ff)' : 'transparent',
+                }}
+              >
+                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Current Status</div>
+                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
+                  {isClockedIn ? 'On Shift' : 'Off Shift'}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: '12px',
+                  border: '1px solid var(--border, #ddd)',
+                  borderRadius: 8,
+                }}
+              >
+                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Clocked In At</div>
+                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
+                  {isClockedIn && activeClockEntry?.clock_in
+                    ? formatTimeOnly(activeClockEntry.clock_in)
+                    : '—'}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: '12px',
+                  border: '1px solid var(--border, #ddd)',
+                  borderRadius: 8,
+                }}
+              >
+                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Time Since Clock In</div>
+                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
+                  {isClockedIn ? (elapsedTime || '0m') : '—'}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: '12px',
+                  border: '1px solid var(--border, #ddd)',
+                  borderRadius: 8,
+                }}
+              >
+                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Last Clock Out</div>
+                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 6 }}>
+                  {lastClockOut ? formatTimeOnly(lastClockOut) : '—'}
+                </div>
+              </div>
+            </div>
+
+            {isClockedIn && activeClockEntry?.clock_in && (
+              <div className="subtle" style={{ marginTop: 10, fontSize: 12 }}>
+                Active session started {formatDateTime(activeClockEntry.clock_in)}.
+              </div>
+            )}
+          </div>
+
+          <div style={{ minWidth: 220, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+            <button
+              type="button"
+              className="iconBtn"
+              onClick={handleClockAction}
+              title={isClockedIn ? 'End your current shift' : 'Start your shift'}
+              disabled={clockLoading}
+              style={{
+                minHeight: 44,
+                fontWeight: 800,
+              }}
+            >
+              {clockLoading ? 'Processing...' : isClockedIn ? 'End Shift' : 'Start Shift'}
+            </button>
+
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: 8,
+                border: '1px solid var(--border, #ddd)',
+                fontSize: 12,
+                color: 'var(--muted)',
+                background: 'var(--card-bg, transparent)',
+              }}
+            >
+              {isClockedIn
+                ? 'You are currently on an active shift. End your shift when your work session is complete.'
+                : 'You are not currently on an active shift. Start your shift when you begin working.'}
+            </div>
           </div>
         </div>
       </div>
@@ -205,9 +404,9 @@ const DashboardPage = () => {
             {loading ? (
               <div className="subtle">Loading requests...</div>
             ) : stats.pendingRequests > 0 ? (
-              <div style={{ 
-                padding: '12px', 
-                background: 'var(--primary-bg, #eff6ff)', 
+              <div style={{
+                padding: '12px',
+                background: 'var(--primary-bg, #eff6ff)',
                 borderRadius: 6,
                 border: '1px solid var(--primary, #2563eb)'
               }}>
@@ -225,7 +424,6 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* media rules :) */}
       <style>{`
         @media (max-width: 900px) {
           .container > div[style*="grid-template-columns: 1fr 1fr"] {

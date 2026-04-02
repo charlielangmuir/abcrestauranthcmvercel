@@ -21,6 +21,14 @@ const SchedulePage = () => {
   return week;
 };
 
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    week.push(day);
+  }
+
+  return week;
+};
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
   const [shifts, setShifts] = useState({});

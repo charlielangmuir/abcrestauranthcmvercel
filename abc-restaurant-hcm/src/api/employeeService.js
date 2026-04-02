@@ -30,7 +30,6 @@ export const employeeService = {
         throw error;
       }
 
-      console.log('Fetched employees:', data);
       return data || [];
     } catch (error) {
       console.error('Error in getAll:', error);
@@ -54,6 +53,50 @@ export const employeeService = {
         )
       `)
       .eq('employee_id', employeeId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Get employee by auth user ID
+   * @param {string} userId
+   * @returns {Promise<Object>}
+   */
+  getByUserId: async (userId) => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select(`
+        *,
+        users (
+          *,
+          user_roles (*)
+        )
+      `)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Update profile fields for the logged-in user
+   * Updates users table for personal identity/contact data.
+   * @param {string} userId
+   * @param {Object} updates
+   * @returns {Promise<Object>}
+   */
+  updateProfileByUserId: async (userId, updates) => {
+    const { data, error } = await supabase
+      .from('users')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .select('*')
       .single();
 
     if (error) throw error;
@@ -119,7 +162,7 @@ export const employeeService = {
       .from('employees')
       .update({
         is_active: false,
-        termination_date: new Date().toISOString().split('T')[0], // Date only
+        termination_date: new Date().toISOString().split('T')[0],
         updated_at: new Date().toISOString(),
       })
       .eq('employee_id', employeeId)
@@ -156,8 +199,6 @@ export const employeeService = {
    * @returns {Promise<Array>}
    */
   search: async (searchTerm) => {
-    // Get all employees first, then filter client-side
-    // This is simpler than complex Supabase queries with nested OR
     const { data, error } = await supabase
       .from('employees')
       .select(`
@@ -170,7 +211,6 @@ export const employeeService = {
 
     if (error) throw error;
 
-    // Filter client-side
     const search = searchTerm.toLowerCase();
     return data.filter(emp => {
       const fullName = `${emp.users?.first_name || ''} ${emp.users?.last_name || ''}`.toLowerCase();
