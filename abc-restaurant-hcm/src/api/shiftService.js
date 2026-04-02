@@ -80,6 +80,7 @@ export const shiftService = {
   },
 
   async create(shiftData) {
+    console.log("create() was called!");
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       
@@ -87,8 +88,10 @@ export const shiftService = {
         console.error('Error getting current user:', userError);
         throw userError;
       }
-
+      console.log("Shift date being inserted:", shiftData.shift_date);
+    console.log("Type:", typeof shiftData.shift_date);
       const { data, error } = await supabase
+      
         .from('shifts')
         .insert([{
           employee_id: shiftData.employee_id,
@@ -131,6 +134,7 @@ export const shiftService = {
       }
       throw error;
     }
+    
   },
 
   async update(shiftId, shiftData) {
