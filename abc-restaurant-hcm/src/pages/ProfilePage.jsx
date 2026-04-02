@@ -1,158 +1,523 @@
 import { useAuth } from '../context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { authService } from '../api/authService';
+import { employeeService } from '../api/employeeService';
 
 const ProfilePage = () => {
   const { user } = useAuth();
+
+  const [employee, setEmployee] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
-  return (
-    <div>
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">My Profile</h1>
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex flex-col items-center">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold mb-4">
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [profileError, setProfileError] = useState('');
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const role = (user?.user_metadata?.role || 'EMPLOYEE').toString();
+  const memberSince = user?.created_at
+    ? new Date(user.created_at).toLocaleDateString(undefined, {
+        month: 'short',
+        year: 'numeric',
+      })
+    : '—';
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) return;
+
+      try {
+        setLoadingProfile(true);
+        setProfileError('');
+
+        const data = await employeeService.getByUserId(user.id);
+        setEmployee(data);
+        setFirstName(data?.users?.first_name || '');
+        setLastName(data?.users?.last_name || '');
+        setPhone(data?.users?.phone || '');
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        setProfileError(error.message || 'Failed to load profile.');
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user?.id]);
+
+  const resetProfileForm = () => {
+    setFirstName(employee?.users?.first_name || '');
+    setLastName(employee?.users?.last_name || '');
+    setPhone(employee?.users?.phone || '');
+  };
+
+  const handleToggleEdit = () => {
+    if (isEditing) {
+      resetProfileForm();
+      setProfileMessage('');
+      setProfileError('');
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user?.id) {
+      setProfileError('User session not found.');
+      return;
+    }
+
+    try {
+      setSavingProfile(true);
+      setProfileMessage('');
+      setProfileError('');
+
+      await employeeService.updateProfileByUserId(user.id, {
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+      });
+
+      const refreshed = await employeeService.getByUserId(user.id);
+      setEmployee(refreshed);
+      setFirstName(refreshed?.users?.first_name || '');
+      setLastName(refreshed?.users?.last_name || '');
+      setPhone(refreshed?.users?.phone || '');
+
+      setProfileMessage('Profile updated successfully.');
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setProfileError(error.message || 'Failed to update profile.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+
+    try {
+      setPasswordLoading(true);
+      setPasswordMessage('');
+      setPasswordError('');
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        setPasswordError('Please fill in all password fields.');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        setPasswordError('New password must be at least 6 characters long.');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setPasswordError('New password and confirm password do not match.');
+        return;
+      }
+
+      if (currentPassword === newPassword) {
+        setPasswordError('New password must be different from your current password.');
+        return;
+      }
+
+      await authService.login(user.email, currentPassword);
+      await authService.updatePassword(newPassword);
+
+      setPasswordMessage('Password updated successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      console.error('Error updating password:', error);
+      setPasswordError(error.message || 'Failed to update password.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: 14,
+    border: '1px solid var(--border, #ddd)',
+    borderRadius: 6,
+    outline: 'none',
+    fontFamily: 'inherit',
+    backgroundColor: 'var(--bg, #fff)',
+  };
+
+  const disabledInputStyle = {
+    ...inputStyle,
+    backgroundColor: '#f9fafb',
+    color: '#6b7280',
+  };
+
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  return (
+    <div className="container" style={{ paddingTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="pageTitle">My Profile</h1>
+          <p className="subtle">Manage your account information and security settings</p>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16, marginTop: 16 }}>
+        <div className="card" style={{ alignSelf: 'start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <div
+              style={{
+                width: 88,
+                height: 88,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 30,
+                fontWeight: 900,
+              }}
+            >
               {user?.email?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-1">
-              {user?.user_metadata?.full_name || 'User Name'}
-            </h2>
-            <p className="text-gray-600 mb-2">{user?.email}</p>
-            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium capitalize">
-              {user?.user_metadata?.role || 'Employee'}
-            </span>
-          </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Member Since: </span>
-                <span className="font-medium text-gray-900">Jan 2026</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Employee ID: </span>
-                <span className="font-medium text-gray-900">EMP-001</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Department: </span>
-                <span className="font-medium text-gray-900">Kitchen</span>
-              </div>
+            <div style={{ fontSize: 22, fontWeight: 900, marginTop: 14 }}>
+              {loadingProfile ? 'Loading...' : fullName || 'No name set'}
             </div>
-          </div>
-        </div>
+            <div className="subtle" style={{ marginTop: 6 }}>
+              {user?.email || '—'}
+            </div>
 
-        <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">Personal Information</h2>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+            <div
+              style={{
+                marginTop: 12,
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: 'var(--primary-bg, #eff6ff)',
+                border: '1px solid var(--primary, #2563eb)',
+                fontSize: 12,
+                fontWeight: 700,
+              }}
             >
-              {isEditing ? 'Cancel' : 'Edit Profile'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                defaultValue={user?.user_metadata?.full_name || 'John Doe'}
-                disabled={!isEditing}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={user?.email || ''}
-                disabled
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                defaultValue="+1 (555) 123-4567"
-                disabled={!isEditing}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                defaultValue="1990-01-01"
-                disabled={!isEditing}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Address
-              </label>
-              <input
-                type="text"
-                defaultValue="123 Main St, Toronto, ON M5V 1A1"
-                disabled={!isEditing}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
+              {role}
             </div>
           </div>
 
-          {isEditing && (
-            <div className="mt-6 flex justify-end space-x-3">
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border, #ddd)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <span className="subtle">Member Since</span>
+                <span style={{ fontWeight: 700 }}>{memberSince}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <span className="subtle">Employee ID</span>
+                <span style={{ fontWeight: 700 }}>{employee?.employee_number || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <span className="subtle">Department</span>
+                <span style={{ fontWeight: 700 }}>{employee?.department || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <span className="subtle">Job Title</span>
+                <span style={{ fontWeight: 700 }}>{employee?.job_title || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <span className="subtle">Employment Type</span>
+                <span style={{ fontWeight: 700 }}>{employee?.employment_type || '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <span className="subtle">Hire Date</span>
+                <span style={{ fontWeight: 700 }}>{employee?.hire_date || '—'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 900 }}>Personal Information</div>
+                <div className="subtle" style={{ marginTop: 4 }}>
+                  Update your personal details
+                </div>
+              </div>
+
               <button
-                onClick={() => setIsEditing(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                type="button"
+                className="iconBtn"
+                onClick={handleToggleEdit}
+                disabled={loadingProfile}
               >
-                Cancel
-              </button>
-              <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Save Changes
+                {isEditing ? 'Cancel' : 'Edit Profile'}
               </button>
             </div>
-          )}
+
+            {profileMessage && (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: '12px',
+                  borderRadius: 8,
+                  background: '#ecfdf5',
+                  border: '1px solid #10b981',
+                  color: '#065f46',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {profileMessage}
+              </div>
+            )}
+
+            {profileError && (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: '12px',
+                  borderRadius: 8,
+                  background: '#fef2f2',
+                  border: '1px solid #ef4444',
+                  color: '#991b1b',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {profileError}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  disabled={!isEditing}
+                  style={isEditing ? inputStyle : disabledInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  disabled={!isEditing}
+                  style={isEditing ? inputStyle : disabledInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={user?.email || ''}
+                  disabled
+                  style={disabledInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  disabled={!isEditing}
+                  style={isEditing ? inputStyle : disabledInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                  Department
+                </label>
+                <input
+                  type="text"
+                  value={employee?.department || ''}
+                  disabled
+                  style={disabledInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                  Job Title
+                </label>
+                <input
+                  type="text"
+                  value={employee?.job_title || ''}
+                  disabled
+                  style={disabledInputStyle}
+                />
+              </div>
+            </div>
+
+            {isEditing && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="iconBtn"
+                  onClick={() => {
+                    resetProfileForm();
+                    setIsEditing(false);
+                    setProfileMessage('');
+                    setProfileError('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="iconBtn"
+                  onClick={handleSaveProfile}
+                  disabled={savingProfile}
+                >
+                  {savingProfile ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>Change Password</div>
+              <div className="subtle" style={{ marginTop: 4 }}>
+                Update your account password securely
+              </div>
+            </div>
+
+            {passwordMessage && (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: '12px',
+                  borderRadius: 8,
+                  background: '#ecfdf5',
+                  border: '1px solid #10b981',
+                  color: '#065f46',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {passwordMessage}
+              </div>
+            )}
+
+            {passwordError && (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: '12px',
+                  borderRadius: 8,
+                  background: '#fef2f2',
+                  border: '1px solid #ef4444',
+                  color: '#991b1b',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {passwordError}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+                <button
+                  type="submit"
+                  className="iconBtn"
+                  disabled={passwordLoading}
+                >
+                  {passwordLoading ? 'Updating Password...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4">My Availability</h2>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <svg
-            className="w-12 h-12 text-gray-400 mx-auto mb-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <p className="text-gray-500">Set your weekly availability</p>
-          <button className="mt-3 px-4 py-2 text-blue-600 hover:text-blue-700 font-medium">
-            Update Availability
-          </button>
-        </div>
-      </div>
+      <style>{`
+        @media (max-width: 1000px) {
+          .container > div[style*="grid-template-columns: 320px 1fr"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 700px) {
+          .container input {
+            font-size: 16px !important;
+          }
+
+          .container > div .card form > div[style*="grid-template-columns: 1fr 1fr"],
+          .container > div .card > div[style*="grid-template-columns: 1fr 1fr"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

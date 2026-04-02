@@ -6,17 +6,21 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const SchedulePage = () => {
   const getWeekDates = (date) => {
-    const curr = new Date(date);
-    const first = curr.getDate() - curr.getDay();
-    const week = [];
-    
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(curr.setDate(first + i));
-      week.push(day);
-    }
-    return week;
-  };
+  const current = new Date(date);
+  const startOfWeek = new Date(current);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(current.getDate() - current.getDay());
 
+  const week = [];
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    week.push(day);
+  }
+
+  return week;
+};
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
   const [shifts, setShifts] = useState({});

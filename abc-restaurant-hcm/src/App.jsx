@@ -10,8 +10,6 @@ import EmployeesPage from './pages/EmployeesPage';
 import PayrollPage from './pages/PayrollPage';
 import ReimbursementsPage from './pages/ReimbursementsPage';
 import ProfilePage from './pages/ProfilePage';
-import ManagerProfile from './pages/ManagerProfile';
-import EmployeeProfile from './pages/EmployeeProfile';
 import ViewSchedule from './pages/ViewSchedule';
 import './fontawesome';
 
@@ -24,12 +22,10 @@ function App() {
       <BrowserRouter>
         <Toaster position="top-right" />
         <Routes>
-          {/* Auth routes */}
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
 
-          {/* Protected app routes */}
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -53,14 +49,11 @@ function App() {
               }
             />
 
-                <Route path="/reimbursements" element={<ReimbursementsPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/manager-profile" element={<ManagerProfile />} />
-                <Route path="/employee-profile" element={<EmployeeProfile />} />
-                <Route path="/view-schedule" element={<ViewSchedule />} />
+            <Route path="/reimbursements" element={<ReimbursementsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/view-schedule" element={<ViewSchedule />} />
           </Route>
 
-          {/* Fallback */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
