@@ -1,28 +1,34 @@
 import { useState, useMemo, useEffect } from 'react';
 import { employeeService } from '../api/employeeService';
 import { shiftService } from '../api/shiftService';
+import { scheduleService } from '../api/scheduleService';
 import { employeeAvailabilityService } from '../api/employeeAvailabilityService';
 import { supabase } from '../api/supabaseClient';
 import toast from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const SchedulePage = () => {
+  const getStartOfWeek = (date) => {
+    const current = new Date(date);
+    const startOfWeek = new Date(current);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(current.getDate() - current.getDay());
+    return startOfWeek;
+  };
+
   const getWeekDates = (date) => {
-  const current = new Date(date);
-  const startOfWeek = new Date(current);
-  startOfWeek.setHours(0, 0, 0, 0);
-  startOfWeek.setDate(current.getDate() - current.getDay());
+    const startOfWeek = getStartOfWeek(date);
+    const week = [];
 
-  const week = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      week.push(day);
+    }
 
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(startOfWeek);
-    day.setDate(startOfWeek.getDate() + i);
-    week.push(day);
-  }
+    return week;
+  };
 
-  return week;
-};
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
   const [shifts, setShifts] = useState({});
@@ -34,6 +40,8 @@ const SchedulePage = () => {
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictInfo, setConflictInfo] = useState(null);
   const [overrideReason, setOverrideReason] = useState('');
+  const [weeklyReport, setWeeklyReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const weekDates = useMemo(() => getWeekDates(selectedWeek), [selectedWeek]);
 
@@ -44,6 +52,14 @@ const SchedulePage = () => {
   useEffect(() => {
     fetchShiftsForWeek();
   }, [selectedWeek]);
+
+  useEffect(() => {
+    loadWeeklyReport();
+  }, [selectedWeek]);
+
+  useEffect(() => {
+    setSelectedDay(weekDates[0]);
+  }, [weekDates]);
 
   const fetchEmployees = async () => {
     try {
@@ -75,8 +91,14 @@ const SchedulePage = () => {
         }
         shiftsByDate[dateKey].push(shift);
       });
-      
-      setShifts(shiftsByDate);
+
+      const currentWeekShifts = {};
+      weekDates.forEach((date) => {
+        const dateKey = formatDateForDB(date);
+        currentWeekShifts[dateKey] = shiftsByDate[dateKey] || [];
+      });
+
+      setShifts(currentWeekShifts);
     } catch (error) {
       console.error('Error fetching shifts:', error);
       if (error.message?.includes('does not exist')) {
@@ -121,6 +143,10 @@ const SchedulePage = () => {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const formatWeekLabel = (startDate, endDate) => {
+    return `Week of ${formatDate(startDate)} - ${formatDate(endDate)}`;
   };
 
   const timeToMinutes = (timeStr) => {
@@ -316,6 +342,54 @@ const SchedulePage = () => {
     return shifts[dateKey] || [];
   };
 
+  const handleGenerateWeeklyReport = async () => {
+    try {
+      setReportLoading(true);
+      const report = await scheduleService.generateWeeklyReport(
+        formatDateForDB(weekDates[0]),
+        formatDateForDB(weekDates[6])
+      );
+      setWeeklyReport(report);
+      toast.success('Weekly report generated');
+    } catch (error) {
+      console.error('Error generating weekly report:', error);
+      toast.error(error.message || 'Failed to generate weekly report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const loadWeeklyReport = async () => {
+    try {
+      setReportLoading(true);
+      const report = await scheduleService.generateWeeklyReport(
+        formatDateForDB(weekDates[0]),
+        formatDateForDB(weekDates[6])
+      );
+      setWeeklyReport(report);
+    } catch (error) {
+      console.error('Error loading weekly report:', error);
+      setWeeklyReport(null);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const formatReportDateTime = (value) => {
+    if (!value) return '—';
+    return new Date(value).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  const formatReportRange = (startDate, endDate) => {
+    return `${formatDate(new Date(`${startDate}T00:00:00`))} - ${formatDate(new Date(`${endDate}T00:00:00`))}`;
+  };
+
   if (loading) {
     return (
       <div className="container" style={{ paddingTop: 10 }}>
@@ -331,27 +405,35 @@ const SchedulePage = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <div>
           <h1 className="pageTitle">
-            Schedule
+            Weekly Overview
             {shiftsLoading && (
               <span style={{ fontSize: 14, color: 'var(--muted)', marginLeft: 12, fontWeight: 400 }}>
                 Loading...
               </span>
             )}
           </h1>
-          <p className="subtle">Manage employee shifts and schedules</p>
+          <p className="subtle">Review this week's staffing summary and drill into daily shifts</p>
         </div>
 
         <button
           type="button"
           className="iconBtn"
-          onClick={() => toast.info('Auto-generate feature coming soon')}
+          onClick={handleGenerateWeeklyReport}
+          disabled={reportLoading}
         >
-          <FontAwesomeIcon icon="fa-solid fa-robot" /> Auto-Generate Schedule
+          <FontAwesomeIcon icon="fa-solid fa-chart-line" /> {reportLoading ? 'Refreshing...' : 'Refresh Weekly Report'}
         </button>
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div className="card" style={{ marginBottom: 16, padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div className="subtle" style={{ fontSize: 12, fontWeight: 700 }}>Selected Week</div>
+            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 6 }}>
+              {formatDate(weekDates[0])} - {formatDate(weekDates[6])}, {weekDates[0].getFullYear()}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
@@ -378,51 +460,194 @@ const SchedulePage = () => {
               Today
             </button>
           </div>
-
-          <div style={{ fontSize: 16, fontWeight: 900 }}>
-            {formatDate(weekDates[0])} - {formatDate(weekDates[6])}, {weekDates[0].getFullYear()}
-          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, marginBottom: 16 }}>
-        {weekDates.map((date) => {
-          const dateKey = getDateKey(date);
-          const dayShifts = getShiftsForDay(date);
-          const isSelected = selectedDay && getDateKey(selectedDay) === dateKey;
-          
-          return (
-            <div
-              key={dateKey}
-              className="card"
-              onClick={() => setSelectedDay(date)}
-              style={{
-                cursor: 'pointer',
-                border: isSelected ? '2px solid var(--primary, #2563eb)' : undefined,
-                background: isToday(date) ? 'var(--primary-bg, #eff6ff)' : undefined,
-              }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>
-                  {formatDayName(date)}
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4 }}>
-                  {date.getDate()}
-                </div>
-                <div className="subtle" style={{ fontSize: 11, marginTop: 4 }}>
-                  {dayShifts.length} shift{dayShifts.length !== 1 ? 's' : ''}
-                </div>
+      {weeklyReport && (
+        <>
+        <div className="overviewStatsGrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Total Shifts</div>
+            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 10 }}>{weeklyReport.totals.totalShifts}</div>
+          </div>
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Scheduled Hours</div>
+            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 10 }}>{weeklyReport.totals.totalHours}</div>
+          </div>
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Employees Scheduled</div>
+            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 10 }}>{weeklyReport.totals.scheduledEmployees}</div>
+          </div>
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Avg. Shift Length</div>
+            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 10 }}>{weeklyReport.totals.averageShiftLength}h</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>Team Overview</div>
+              <div className="subtle" style={{ marginTop: 4 }}>
+                {formatReportRange(weeklyReport.period.startDate, weeklyReport.period.endDate)}
               </div>
             </div>
-          );
-        })}
-      </div>
+
+            <div className="subtle" style={{ fontSize: 12 }}>
+              Generated {formatReportDateTime(weeklyReport.generatedAt)}
+            </div>
+          </div>
+
+          <div className="overviewInsightsGrid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>Weekly Summary</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {weeklyReport.weeklySummary.length > 0 ? (
+                  weeklyReport.weeklySummary.map((week) => (
+                    <div
+                      key={week.startDate}
+                      style={{
+                        padding: 12,
+                        border: '1px solid var(--border, #ddd)',
+                        borderRadius: 8,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>{week.label}</div>
+                        <div className="subtle" style={{ fontSize: 12, marginTop: 4 }}>
+                          {week.employeeCount} employee{week.employeeCount !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>{week.shiftCount} shift{week.shiftCount !== 1 ? 's' : ''}</div>
+                        <div className="subtle" style={{ fontSize: 12, marginTop: 4 }}>{week.totalHours}h</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="subtle" style={{ padding: 12, border: '1px solid var(--border, #ddd)', borderRadius: 8 }}>
+                    No shifts scheduled for this week.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>Employee Breakdown</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border, #ddd)' }}>
+                      <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase' }}>Employee</th>
+                      <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase' }}>Department</th>
+                      <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase' }}>Shifts</th>
+                      <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase' }}>Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeklyReport.employeeSummary.length > 0 ? (
+                      weeklyReport.employeeSummary.map((entry) => (
+                        <tr key={entry.employeeId} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '10px' }}>
+                            <div style={{ fontSize: 14, fontWeight: 700 }}>{entry.name}</div>
+                            <div className="subtle" style={{ fontSize: 12, marginTop: 2 }}>{entry.jobTitle}</div>
+                          </td>
+                          <td style={{ padding: '10px', fontSize: 14 }}>{entry.department}</td>
+                          <td style={{ padding: '10px', fontSize: 14, textAlign: 'right' }}>{entry.shiftCount}</td>
+                          <td style={{ padding: '10px', fontSize: 14, textAlign: 'right', fontWeight: 700 }}>{entry.totalHours}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" style={{ padding: '16px 10px', textAlign: 'center' }} className="subtle">
+                          No employee data for this week.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 10 }}>Department Summary</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {weeklyReport.departmentSummary.length > 0 ? (
+                  weeklyReport.departmentSummary.map((entry) => (
+                    <div
+                      key={entry.department}
+                      style={{
+                        padding: 12,
+                        border: '1px solid var(--border, #ddd)',
+                        borderRadius: 8,
+                      }}
+                    >
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{entry.department}</div>
+                      <div className="subtle" style={{ fontSize: 12, marginTop: 4 }}>
+                        {entry.employeeCount} employee{entry.employeeCount !== 1 ? 's' : ''} scheduled
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 13 }}>
+                        <span>{entry.shiftCount} shift{entry.shiftCount !== 1 ? 's' : ''}</span>
+                        <span style={{ fontWeight: 700 }}>{entry.totalHours}h</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="subtle" style={{ padding: 12, border: '1px solid var(--border, #ddd)', borderRadius: 8 }}>
+                    No department totals available.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        </>
+      )}
 
       {selectedDay ? (
         <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 900 }}>
+              <div className="subtle" style={{ marginBottom: 10 }}>
+                Weekly Activity
+              </div>
+              <div className="daySelectorRow" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, marginBottom: 16 }}>
+                {weekDates.map((date) => {
+                  const isSelected = selectedDay && getDateKey(selectedDay) === getDateKey(date);
+                  const dayShifts = getShiftsForDay(date);
+
+                  return (
+                    <button
+                      key={getDateKey(date)}
+                      type="button"
+                      onClick={() => setSelectedDay(date)}
+                      className="iconBtn"
+                      style={{
+                        padding: '10px 8px',
+                        border: isSelected ? '2px solid var(--primary, #2563eb)' : '1px solid var(--border, #ddd)',
+                        background: isSelected ? 'var(--primary-bg, #eff6ff)' : 'transparent',
+                        color: 'inherit',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 4,
+                        minHeight: 98,
+                      }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>{formatDayName(date)}</span>
+                      <span style={{ fontSize: 18, fontWeight: 900 }}>{date.getDate()}</span>
+                      <span className="subtle" style={{ fontSize: 11 }}>
+                        {dayShifts.length} shift{dayShifts.length !== 1 ? 's' : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="subtle" style={{ marginBottom: 6 }}>Day Details</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>
                 {selectedDay.toLocaleDateString(undefined, { 
                   weekday: 'long', 
                   month: 'long', 
@@ -512,10 +737,10 @@ const SchedulePage = () => {
         <div className="card" style={{ textAlign: 'center', padding: '60px 20px' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}><FontAwesomeIcon icon="fa-solid fa-calendar" /></div>
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
-            Select a day to view and manage shifts
+            Select a week to view and manage shifts
           </div>
           <div className="subtle">
-            Click on any day in the week view above to get started
+            Choose a week above, then pick a day in the manager panel
           </div>
         </div>
       )}
@@ -554,14 +779,25 @@ const SchedulePage = () => {
       )}
 
       <style>{`
+        @media (max-width: 1100px) {
+          .overviewStatsGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+          .overviewInsightsGrid {
+            grid-template-columns: 1fr !important;
+          }
+        }
         @media (max-width: 900px) {
-          .container > div[style*="grid-template-columns: repeat(7, 1fr)"] {
-            grid-template-columns: repeat(4, 1fr) !important;
+          .daySelectorRow {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
           }
         }
         @media (max-width: 600px) {
-          .container > div[style*="grid-template-columns: repeat(7, 1fr)"] {
-            grid-template-columns: repeat(2, 1fr) !important;
+          .overviewStatsGrid {
+            grid-template-columns: 1fr !important;
+          }
+          .daySelectorRow {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }
         }
       `}</style>
