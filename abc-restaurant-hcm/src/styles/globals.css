@@ -722,4 +722,364 @@ a:hover { text-decoration: underline; }
   }
 }
 
+/* ============================================================
+   Reimbursement Page Styles  (prefix: reimb-)
+   All classes here are scoped to the reimbursement feature.
+   ============================================================ */
 
+.reimb-page-wrap {
+  padding-top: 10px;
+}
+
+/* Header row */
+.reimb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.reimb-btn-primary {
+  background: var(--primary);
+  color: white;
+  font-weight: 700;
+  padding: 10px 16px;
+}
+
+/* Summary stats grid */
+.reimb-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.reimb-stat-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.reimb-stat-value {
+  font-size: 34px;
+  font-weight: 900;
+  margin-top: 8px;
+}
+
+.reimb-stat-value-warning {
+  color: #d97706;
+}
+
+.reimb-stat-value-success {
+  color: #16a34a;
+}
+
+/* Card header with filter */
+.reimb-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.reimb-card-title {
+  font-size: 18px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.reimb-filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reimb-filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+/* Table */
+.reimb-table-wrap {
+  overflow-x: auto;
+}
+
+.reimb-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.reimb-th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+.reimb-tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.reimb-tr:hover {
+  background: #f9fafb;
+}
+
+.reimb-td {
+  padding: 16px;
+  font-size: 14px;
+}
+
+.reimb-td-muted {
+  color: var(--muted);
+}
+
+.reimb-td-bold {
+  font-weight: 700;
+}
+
+.reimb-td-semibold {
+  font-weight: 600;
+}
+
+/* Status badges */
+.reimb-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+.reimb-badge-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.reimb-badge-approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.reimb-badge-paid {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.reimb-badge-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Action buttons inside the table */
+.reimb-action-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reimb-btn-approve {
+  background: transparent;
+  border: none;
+  color: #16a34a;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.reimb-btn-reject {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.reimb-btn-pay {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Empty state */
+.reimb-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+.reimb-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+/* Modal overlay */
+.reimb-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.reimb-modal {
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.reimb-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.reimb-modal-title {
+  font-size: 24px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.reimb-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+/* Form elements inside the modal */
+.reimb-form-group {
+  margin-bottom: 16px;
+}
+
+.reimb-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.reimb-form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.reimb-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.reimb-form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.reimb-form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  box-sizing: border-box;
+}
+
+.reimb-form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.reimb-form-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.reimb-form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.reimb-form-cancel {
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reimb-form-submit {
+  padding: 10px 20px;
+  border: none;
+  background: var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reimb-form-submit:disabled,
+.reimb-form-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reimb-form-error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 640px) {
+  .reimb-form-row {
+    grid-template-columns: 1fr;
+  }
+}

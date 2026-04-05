@@ -1,151 +1,148 @@
+import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import ReimbursementForm from '../components/reimbursement/ReimbursementForm';
+import ReimbursementList from '../components/reimbursement/ReimbursementList';
+
+// Original helper — kept unchanged
+const getStatusStyle = (status) => {
+  switch (status) {
+    case 'Pending':
+      return { background: '#fef3c7', color: '#92400e' };
+    case 'Approved':
+      return { background: '#d1fae5', color: '#065f46' };
+    case 'Paid':
+      return { background: '#dbeafe', color: '#1e40af' };
+    case 'Rejected':
+      return { background: '#fee2e2', color: '#991b1b' };
+    default:
+      return { background: '#f3f4f6', color: '#374151' };
+  }
+};
+
+// Original helper — kept unchanged
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const MOCK_DATA = [
+  { reimbursement_id: 1, description: 'Taxi fare to work', amount: 25.50, date: '2026-02-05', status: 'Pending',  category: 'Travel',    notes: null, employees: { users: { first_name: 'Alice', last_name: 'Wong' } } },
+  { reimbursement_id: 2, description: 'Uniform purchase',  amount: 89.99, date: '2026-02-03', status: 'Approved', category: 'Uniform',   notes: null, employees: { users: { first_name: 'Bob',   last_name: 'Smith' } } },
+  { reimbursement_id: 3, description: 'Parking fee',       amount: 15.00, date: '2026-02-01', status: 'Paid',     category: 'Travel',    notes: null, employees: { users: { first_name: 'Alice', last_name: 'Wong' } } },
+];
+
+const STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Paid', 'Rejected'];
+
+let nextId = 4;
+
 const ReimbursementsPage = () => {
-  const reimbursements = [
-    { id: 1, description: 'Taxi fare to work', amount: 25.50, date: '2026-02-05', status: 'Pending' },
-    { id: 2, description: 'Uniform purchase', amount: 89.99, date: '2026-02-03', status: 'Approved' },
-    { id: 3, description: 'Parking fee', amount: 15.00, date: '2026-02-01', status: 'Paid' },
-  ];
+  const { user } = useAuth();
 
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case 'Pending':
-        return { background: '#fef3c7', color: '#92400e' };
-      case 'Approved':
-        return { background: '#d1fae5', color: '#065f46' };
-      case 'Paid':
-        return { background: '#dbeafe', color: '#1e40af' };
-      case 'Rejected':
-        return { background: '#fee2e2', color: '#991b1b' };
-      default:
-        return { background: '#f3f4f6', color: '#374151' };
-    }
+  const role = (user?.user_metadata?.role || 'EMPLOYEE').toString().toUpperCase();
+  const isManager = ['MANAGER', 'ADMIN'].includes(role);
+
+  const [reimbursements, setReimbursements] = useState(MOCK_DATA);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  const handleAdd = (formData) => {
+    const newItem = {
+      reimbursement_id: nextId++,
+      ...formData,
+      status: 'Pending',
+      employees: { users: { first_name: user?.user_metadata?.first_name || 'You', last_name: '' } },
+    };
+    setReimbursements((prev) => [newItem, ...prev]);
   };
 
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+  const handleStatusChange = (id, newStatus) => {
+    setReimbursements((prev) =>
+      prev.map((r) => (r.reimbursement_id === id ? { ...r, status: newStatus } : r))
+    );
   };
+
+  const handleDelete = (id) => {
+    setReimbursements((prev) => prev.filter((r) => r.reimbursement_id !== id));
+  };
+
+  const totalRequested = reimbursements.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const pendingCount   = reimbursements.filter((r) => r.status === 'Pending').length;
+  const paidAmount     = reimbursements.filter((r) => r.status === 'Paid').reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+  const filteredItems =
+    statusFilter === 'All'
+      ? reimbursements
+      : reimbursements.filter((r) => r.status === statusFilter);
 
   return (
-    <div className="container" style={{ paddingTop: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+    <div className="container reimb-page-wrap">
+      {/* Header */}
+      <div className="reimb-header">
         <div>
           <h1 className="pageTitle">Reimbursements</h1>
           <p className="subtle">Submit and track your expense reimbursements</p>
         </div>
-
         <button
           type="button"
-          className="iconBtn"
-          style={{
-            background: 'var(--primary)',
-            color: 'white',
-            fontWeight: 700,
-            padding: '10px 16px',
-          }}
+          className="iconBtn reimb-btn-primary"
+          onClick={() => setIsFormOpen(true)}
         >
           + New Request
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+      {/* Summary cards */}
+      <div className="reimb-stats-grid">
         <div className="card">
-          <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 700 }}>Total Requested</div>
-          <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8 }}>$130.49</div>
+          <div className="reimb-stat-label">Total Requested</div>
+          <div className="reimb-stat-value">${totalRequested.toFixed(2)}</div>
         </div>
-
         <div className="card">
-          <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 700 }}>Pending Approval</div>
-          <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8, color: '#d97706' }}>1</div>
+          <div className="reimb-stat-label">Pending Approval</div>
+          <div className="reimb-stat-value reimb-stat-value-warning">{pendingCount}</div>
         </div>
-
         <div className="card">
-          <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 700 }}>Paid Out</div>
-          <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8, color: '#16a34a' }}>$15.00</div>
+          <div className="reimb-stat-label">Paid Out</div>
+          <div className="reimb-stat-value reimb-stat-value-success">${paidAmount.toFixed(2)}</div>
         </div>
       </div>
 
+      {/* Main table card */}
       <div className="card">
-        <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border, #ddd)', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 900 }}>My Requests</h2>
+        <div className="reimb-card-header">
+          <h2 className="reimb-card-title">{isManager ? 'All Requests' : 'My Requests'}</h2>
+          <div className="reimb-filter-row">
+            <select
+              className="reimb-filter-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by status"
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                  Date
-                </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                  Description
-                </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                  Amount
-                </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                  Status
-                </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {reimbursements.map((item) => (
-                <tr
-                  key={item.id}
-                  style={{ borderBottom: '1px solid var(--border)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <td style={{ padding: '16px', fontSize: 14, color: 'var(--muted)' }}>
-                    {formatDate(item.date)}
-                  </td>
-                  <td style={{ padding: '16px', fontSize: 14, fontWeight: 600 }}>
-                    {item.description}
-                  </td>
-                  <td style={{ padding: '16px', fontSize: 14, fontWeight: 700 }}>
-                    ${item.amount.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '4px 10px',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        borderRadius: '8px',
-                        ...getStatusStyle(item.status)
-                      }}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    <button
-                      type="button"
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--primary)',
-                        fontWeight: 600,
-                        fontSize: 14,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ReimbursementList
+          items={filteredItems}
+          isManager={isManager}
+          onStatusChange={handleStatusChange}
+          onDelete={handleDelete}
+        />
       </div>
+
+      {/* New request modal */}
+      <ReimbursementForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onAdd={handleAdd}
+      />
     </div>
   );
 };
