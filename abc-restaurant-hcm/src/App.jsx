@@ -4,6 +4,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 
 import LoginPage from './pages/LoginPage';
+import NotificationsPage from './pages/NotificationsPage';
 import DashboardPage from './pages/DashboardPage';
 import SchedulePage from './pages/SchedulePage';
 import EmployeesPage from './pages/EmployeesPage';
@@ -54,6 +55,7 @@ function App() {
             <Route path="/reimbursements" element={<ReimbursementsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/view-schedule" element={<ViewSchedule />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
