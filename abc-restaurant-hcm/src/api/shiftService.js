@@ -12,6 +12,8 @@ export const shiftService = {
             employee_number,
             job_title,
             department,
+            hourly_rate,
+            salary,
             users (
               user_id,
               first_name,
@@ -52,6 +54,8 @@ export const shiftService = {
             employee_number,
             job_title,
             department,
+            hourly_rate,
+            salary,
             users (
               user_id,
               first_name,
@@ -111,6 +115,8 @@ export const shiftService = {
             employee_number,
             job_title,
             department,
+            hourly_rate,
+            salary,
             users (
               user_id,
               first_name,
@@ -163,6 +169,8 @@ export const shiftService = {
             employee_number,
             job_title,
             department,
+            hourly_rate,
+            salary,
             users (
               user_id,
               first_name,

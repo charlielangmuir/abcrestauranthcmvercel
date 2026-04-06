@@ -1,101 +1,150 @@
 import { supabase } from './supabaseClient';
 
+const REQUESTS_TABLE = 'reimbursement_requests';
+const CATEGORIES_TABLE = 'reimbursement_categories';
+
+const formatStatus = (value) => {
+  if (!value) return 'Pending';
+  const normalized = String(value).trim().toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const normalizeReimbursement = (item) => ({
+  ...item,
+  reimbursement_id: item?.reimbursement_id,
+  description: item?.description || '',
+  amount: Number(item?.amount || 0),
+  date: item?.expense_date || item?.created_at || '',
+  category: item?.reimbursement_categories?.category_name || null,
+  category_id: item?.category_id ?? item?.reimbursement_categories?.category_id ?? null,
+  receipt_url: item?.receipt_url || null,
+  status: formatStatus(item?.status),
+});
+
 export const reimbursementService = {
-  /**
-   * Get reimbursements submitted by a specific employee
-   * @param {number} employeeId
-   * @returns {Promise<Array>}
-   */
+  getCategories: async () => {
+    const { data, error } = await supabase
+      .from(CATEGORIES_TABLE)
+      .select('category_id, category_name, description, requires_receipt')
+      .order('category_name', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
   getByEmployeeId: async (employeeId) => {
     const { data, error } = await supabase
-      .from('reimbursements')
+      .from(REQUESTS_TABLE)
       .select(`
         *,
         employees (
           employee_id,
           users ( first_name, last_name )
+        ),
+        reimbursement_categories (
+          category_id,
+          category_name,
+          description,
+          requires_receipt
         )
       `)
       .eq('employee_id', employeeId)
-      .order('created_at', { ascending: false });
+      .order('expense_date', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map(normalizeReimbursement);
   },
 
-  /**
-   * Get all reimbursements (manager / admin view)
-   * @returns {Promise<Array>}
-   */
   getAll: async () => {
     const { data, error } = await supabase
-      .from('reimbursements')
+      .from(REQUESTS_TABLE)
       .select(`
         *,
         employees (
           employee_id,
           users ( first_name, last_name )
+        ),
+        reimbursement_categories (
+          category_id,
+          category_name,
+          description,
+          requires_receipt
         )
       `)
-      .order('created_at', { ascending: false });
+      .order('expense_date', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map(normalizeReimbursement);
   },
 
-  /**
-   * Create a new reimbursement request
-   * @param {Object} payload
-   * @returns {Promise<Object>}
-   */
   create: async (payload) => {
-    const { data, error } = await supabase
-      .from('reimbursements')
-      .insert({
-        ...payload,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select('*')
-      .single();
+    const categoryName = payload.category;
+    let categoryId = payload.categoryId ?? null;
 
-    if (error) throw error;
-    return data;
-  },
+    if (!categoryId && categoryName) {
+      const { data: category, error: categoryError } = await supabase
+        .from(CATEGORIES_TABLE)
+        .select('category_id')
+        .eq('category_name', categoryName)
+        .single();
 
-  /**
-   * Update the status of a reimbursement (Approved / Rejected / Paid)
-   * @param {number} id  reimbursement_id
-   * @param {string} status
-   * @param {string} [notes]
-   * @returns {Promise<Object>}
-   */
-  updateStatus: async (id, status, notes = '') => {
-    const updates = {
-      status,
-      updated_at: new Date().toISOString(),
+      if (categoryError) throw categoryError;
+      categoryId = category?.category_id ?? null;
+    }
+
+    const insertPayload = {
+      employee_id: payload.employee_id,
+      category_id: categoryId,
+      amount: payload.amount,
+      expense_date: payload.date,
+      description: payload.description,
+      receipt_url: payload.receiptUrl || null,
+      status: (payload.status || 'Pending').toLowerCase(),
     };
-    if (notes) updates.notes = notes;
 
     const { data, error } = await supabase
-      .from('reimbursements')
-      .update(updates)
-      .eq('reimbursement_id', id)
-      .select('*')
+      .from(REQUESTS_TABLE)
+      .insert(insertPayload)
+      .select(`
+        *,
+        reimbursement_categories (
+          category_id,
+          category_name,
+          description,
+          requires_receipt
+        )
+      `)
       .single();
 
     if (error) throw error;
-    return data;
+    return normalizeReimbursement(data);
   },
 
-  /**
-   * Delete a reimbursement request (employee can delete their own Pending requests)
-   * @param {number} id  reimbursement_id
-   * @returns {Promise<void>}
-   */
+  updateStatus: async (id, status) => {
+    const { data, error } = await supabase
+      .from(REQUESTS_TABLE)
+      .update({
+        status: status.toLowerCase(),
+      })
+      .eq('reimbursement_id', id)
+      .select(`
+        *,
+        reimbursement_categories (
+          category_id,
+          category_name,
+          description,
+          requires_receipt
+        )
+      `)
+      .single();
+
+    if (error) throw error;
+    return normalizeReimbursement(data);
+  },
+
   delete: async (id) => {
     const { error } = await supabase
-      .from('reimbursements')
+      .from(REQUESTS_TABLE)
       .delete()
       .eq('reimbursement_id', id);
 

@@ -1,19 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = ['Travel', 'Equipment', 'Uniform', 'Meals', 'Other'];
+const FALLBACK_CATEGORIES = ['Meals', 'Transportation', 'Supplies', 'Uniform', 'Training', 'Other'];
 
-const ReimbursementForm = ({ isOpen, onClose, onAdd }) => {
+const ReimbursementForm = ({ isOpen, onClose, onAdd, categories = [] }) => {
   const today = new Date().toISOString().split('T')[0];
+  const availableCategories = categories.length > 0
+    ? categories.map((item) => item.category_name)
+    : FALLBACK_CATEGORIES;
 
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
     date: today,
-    category: 'Other',
+    category: availableCategories.includes('Other') ? 'Other' : availableCategories[0] || 'Other',
     notes: '',
   });
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      category: availableCategories.includes(prev.category)
+        ? prev.category
+        : (availableCategories.includes('Other') ? 'Other' : availableCategories[0] || 'Other'),
+    }));
+  }, [availableCategories]);
 
   if (!isOpen) return null;
 
@@ -23,12 +35,18 @@ const ReimbursementForm = ({ isOpen, onClose, onAdd }) => {
   };
 
   const handleClose = () => {
-    setFormData({ description: '', amount: '', date: today, category: 'Other', notes: '' });
+    setFormData({
+      description: '',
+      amount: '',
+      date: today,
+      category: availableCategories.includes('Other') ? 'Other' : availableCategories[0] || 'Other',
+      notes: '',
+    });
     setError('');
     onClose();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -43,16 +61,20 @@ const ReimbursementForm = ({ isOpen, onClose, onAdd }) => {
       return;
     }
 
-    onAdd({
-      description: formData.description.trim(),
-      amount,
-      date: formData.date,
-      category: formData.category,
-      notes: formData.notes.trim() || null,
-    });
+    try {
+      await onAdd({
+        description: formData.description.trim(),
+        amount,
+        date: formData.date,
+        category: formData.category,
+        notes: formData.notes.trim() || null,
+      });
 
-    toast.success('Reimbursement request submitted!');
-    handleClose();
+      toast.success('Reimbursement request submitted!');
+      handleClose();
+    } catch (submitError) {
+      setError(submitError.message || 'Failed to submit reimbursement request.');
+    }
   };
 
   return (
@@ -129,7 +151,7 @@ const ReimbursementForm = ({ isOpen, onClose, onAdd }) => {
               value={formData.category}
               onChange={handleChange}
             >
-              {CATEGORIES.map((cat) => (
+              {availableCategories.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
