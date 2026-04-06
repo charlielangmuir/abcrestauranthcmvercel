@@ -147,7 +147,6 @@ const PayrollPage = () => {
 
     setProcessing(true);
     try {
-      // In a real app, persist a payroll batch record to DB here.
       await calculatePayroll();
       toast.success('Payroll processed successfully.');
     } catch (error) {

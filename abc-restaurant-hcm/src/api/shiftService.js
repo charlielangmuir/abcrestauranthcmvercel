@@ -1,35 +1,31 @@
 import { supabase } from './supabaseClient';
 
+const EMPLOYEE_SELECT = `
+  employee_id,
+  employee_number,
+  job_title,
+  department,
+  hourly_rate,
+  users (
+    user_id,
+    first_name,
+    last_name,
+    email
+  )
+`;
+
 export const shiftService = {
   async getShiftsByDateRange(startDate, endDate) {
     try {
       const { data, error } = await supabase
         .from('shifts')
-        .select(`
-          *,
-          employees (
-            employee_id,
-            employee_number,
-            job_title,
-            department,
-            users (
-              user_id,
-              first_name,
-              last_name,
-              email
-            )
-          )
-        `)
+        .select(`*, employees (${EMPLOYEE_SELECT})`)
         .gte('shift_date', startDate)
         .lte('shift_date', endDate)
         .order('shift_date', { ascending: true })
         .order('start_time', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching shifts:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       return data || [];
     } catch (error) {
       console.error('Failed to fetch shifts:', error);
@@ -45,29 +41,11 @@ export const shiftService = {
     try {
       const { data, error } = await supabase
         .from('shifts')
-        .select(`
-          *,
-          employees (
-            employee_id,
-            employee_number,
-            job_title,
-            department,
-            users (
-              user_id,
-              first_name,
-              last_name,
-              email
-            )
-          )
-        `)
+        .select(`*, employees (${EMPLOYEE_SELECT})`)
         .eq('shift_date', date)
         .order('start_time', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching shifts for date:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       return data || [];
     } catch (error) {
       console.error('Failed to fetch shifts for date:', error);
@@ -83,15 +61,12 @@ export const shiftService = {
     console.log("create() was called!");
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        console.error('Error getting current user:', userError);
-        throw userError;
-      }
+      if (userError) throw userError;
+
       console.log("Shift date being inserted:", shiftData.shift_date);
-    console.log("Type:", typeof shiftData.shift_date);
+      console.log("Type:", typeof shiftData.shift_date);
+
       const { data, error } = await supabase
-      
         .from('shifts')
         .insert([{
           employee_id: shiftData.employee_id,
@@ -104,28 +79,10 @@ export const shiftService = {
           notes: shiftData.notes || null,
           created_by: userData.user?.id || null,
         }])
-        .select(`
-          *,
-          employees (
-            employee_id,
-            employee_number,
-            job_title,
-            department,
-            users (
-              user_id,
-              first_name,
-              last_name,
-              email
-            )
-          )
-        `)
+        .select(`*, employees (${EMPLOYEE_SELECT})`)
         .single();
 
-      if (error) {
-        console.error('Error creating shift:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       return data;
     } catch (error) {
       console.error('Failed to create shift:', error);
@@ -134,13 +91,11 @@ export const shiftService = {
       }
       throw error;
     }
-    
   },
 
   async update(shiftId, shiftData) {
     try {
       const updateData = {};
-      
       if (shiftData.employee_id !== undefined) updateData.employee_id = shiftData.employee_id;
       if (shiftData.shift_date !== undefined) updateData.shift_date = shiftData.shift_date;
       if (shiftData.start_time !== undefined) updateData.start_time = shiftData.start_time;
@@ -149,35 +104,16 @@ export const shiftService = {
       if (shiftData.position !== undefined) updateData.position = shiftData.position;
       if (shiftData.status !== undefined) updateData.status = shiftData.status;
       if (shiftData.notes !== undefined) updateData.notes = shiftData.notes;
-      
       updateData.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase
         .from('shifts')
         .update(updateData)
         .eq('shift_id', shiftId)
-        .select(`
-          *,
-          employees (
-            employee_id,
-            employee_number,
-            job_title,
-            department,
-            users (
-              user_id,
-              first_name,
-              last_name,
-              email
-            )
-          )
-        `)
+        .select(`*, employees (${EMPLOYEE_SELECT})`)
         .single();
 
-      if (error) {
-        console.error('Error updating shift:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       return data;
     } catch (error) {
       console.error('Failed to update shift:', error);
@@ -195,11 +131,7 @@ export const shiftService = {
         .delete()
         .eq('shift_id', shiftId);
 
-      if (error) {
-        console.error('Error deleting shift:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       return true;
     } catch (error) {
       console.error('Failed to delete shift:', error);
@@ -214,40 +146,18 @@ export const shiftService = {
     try {
       let query = supabase
         .from('shifts')
-        .select(`
-          *,
-          employees (
-            employee_id,
-            employee_number,
-            job_title,
-            department,
-            users (
-              user_id,
-              first_name,
-              last_name,
-              email
-            )
-          )
-        `)
+        .select(`*, employees (${EMPLOYEE_SELECT})`)
         .eq('employee_id', employeeId);
 
-      if (startDate) {
-        query = query.gte('shift_date', startDate);
-      }
-      if (endDate) {
-        query = query.lte('shift_date', endDate);
-      }
+      if (startDate) query = query.gte('shift_date', startDate);
+      if (endDate) query = query.lte('shift_date', endDate);
 
-      query = query.order('shift_date', { ascending: true })
-                   .order('start_time', { ascending: true });
+      query = query
+        .order('shift_date', { ascending: true })
+        .order('start_time', { ascending: true });
 
       const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching employee shifts:', error);
-        throw error;
-      }
-
+      if (error) throw error;
       return data || [];
     } catch (error) {
       console.error('Failed to fetch employee shifts:', error);
