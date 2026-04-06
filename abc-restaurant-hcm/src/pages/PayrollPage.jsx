@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { employeeService } from '../api/employeeService';
 import { shiftService } from '../api/shiftService';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 const parseTimeToMinutes = (time) => {
   if (!time) return 0;
@@ -144,22 +145,65 @@ const PayrollPage = () => {
   }, [user]);
 
   const handleProcessPayroll = async () => {
-    if (!user?.user_metadata?.role || user.user_metadata.role.toUpperCase() !== 'ADMIN') {
-      toast.error('Only admin can process payroll.');
-      return;
-    }
+  if (!user?.user_metadata?.role || user.user_metadata.role.toUpperCase() !== 'ADMIN') {
+    toast.error('Only admin can process payroll.');
+    return;
+  }
 
-    setProcessing(true);
-    try {
-      await calculatePayroll();
-      toast.success('Payroll processed successfully.');
-    } catch (error) {
-      console.error('Payroll processing failed:', error);
-      toast.error('Payroll processing failed.');
-    } finally {
-      setProcessing(false);
-    }
-  };
+  setProcessing(true);
+  try {
+    await calculatePayroll();
+
+    // Build worksheet data
+    const period = getPeriodRange();
+
+    const headers = ['Employee', 'Department', 'Hours Worked', 'Hourly Rate', 'Hourly Limit', 'Net Pay'];
+
+    const rows = payrollRecords.map((rec) => [
+      rec.name,
+      rec.department,
+      rec.totalHours,
+      rec.hourlyRate,
+      rec.hourlyLimit || 0,
+      rec.totalPay,
+    ]);
+
+    const totalsRow = [
+      'TOTAL',
+      '',
+      payrollRecords.reduce((sum, r) => sum + r.totalHours, 0).toFixed(2),
+      '',
+      '',
+      payrollRecords.reduce((sum, r) => sum + r.totalPay, 0).toFixed(2),
+    ];
+
+    const wsData = [headers, ...rows, totalsRow];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 28 }, // Employee
+      { wch: 18 }, // Department
+      { wch: 14 }, // Hours
+      { wch: 14 }, // Rate
+      { wch: 14 }, // Hourly Limit
+      { wch: 14 }, // Net Pay
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Payroll');
+
+    const fileName = `Payroll_${period.startDate}_to_${period.endDate}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast.success('Payroll processed and downloaded successfully.');
+  } catch (error) {
+    console.error('Payroll processing failed:', error);
+    toast.error('Payroll processing failed.');
+  } finally {
+    setProcessing(false);
+  }
+};
 
   useEffect(() => {
     calculatePayroll();
