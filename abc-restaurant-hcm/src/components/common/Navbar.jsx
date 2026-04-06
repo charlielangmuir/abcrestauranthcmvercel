@@ -29,16 +29,26 @@ const Navbar = ({ toggleSidebar }) => {
   fetchNotifications();
 
   const channel = supabase
-    .channel('user-notifications')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'notifications',
-      filter: `user_id=eq.${user.id}`
-    }, (payload) => {
-      setNotifications(prev => [payload.new, ...prev]);
-    })
-    .subscribe();
+  .channel(`user-notifications-${user.id}`)
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'notifications',
+    filter: `user_id=eq.${user.id}`
+  }, (payload) => {
+    setNotifications(prev => [payload.new, ...prev]);
+  })
+  .on('postgres_changes', {
+    event: 'UPDATE',
+    schema: 'public',
+    table: 'notifications',
+    filter: `user_id=eq.${user.id}`
+  }, (payload) => {
+    setNotifications(prev =>
+      prev.map(n => n.notification_id === payload.new.notification_id ? payload.new : n)
+    );
+  })
+  .subscribe();
 
   return () => supabase.removeChannel(channel);
 }, [user?.id]);
@@ -63,12 +73,12 @@ const Navbar = ({ toggleSidebar }) => {
   }, [openNotif]);
 
   const timeSince = (dateStr) => {
-    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-    if (diff < 60) return `${Math.floor(diff)}s ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
-  };
+  const diff = (Date.now() - new Date(dateStr + 'Z').getTime()) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
 
   const handleLogout = async () => {
     try {
@@ -84,7 +94,8 @@ const Navbar = ({ toggleSidebar }) => {
   const email = user?.email || 'User';
   const role = (user?.user_metadata?.role || 'Employee').toString();
   const initial = (email?.charAt(0) || 'U').toUpperCase();
-
+  console.log('notifications:', notifications);
+  const unreadCount = notifications.filter(n => n.is_read === false).length;
   return (
     <header className="topbar">
       <div className="topbarInner">
@@ -114,13 +125,26 @@ const Navbar = ({ toggleSidebar }) => {
 
           {/* ================= NOTIFICATION WRAPPER ================= */}
           <div className="notifWrapper" ref={notifRef}>
-            <div
-              className="notifBell"
-              onClick={() => setOpenNotif(!openNotif)}
-              title="Notifications"
-            >
-              <i className="fa-solid fa-bell" style={{ fontSize: '16px' }}></i>
-            </div>
+          <div
+            className="notifBell"
+            onClick={() => setOpenNotif(!openNotif)}
+            title="Notifications"
+            style={{ position: 'relative' }}
+          >
+            <i className="fa-solid fa-bell" style={{ fontSize: '16px' }}></i>
+            {unreadCount > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: 4,
+                right: 4,
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'var(--danger)',
+                border: '1.5px solid white',
+              }} />
+            )}
+          </div>
 
             {openNotif && (
               <div className="notifList">

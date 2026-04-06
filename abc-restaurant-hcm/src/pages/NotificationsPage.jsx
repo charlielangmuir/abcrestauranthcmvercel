@@ -47,7 +47,6 @@ const NotificationsPage = () => {
       </div>
     );
   }
-
   return (
     <div className="container" style={{ paddingTop: 10 }}>
 
