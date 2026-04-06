@@ -160,7 +160,7 @@ a:hover { text-decoration: underline; }
   right: 0;
   top: 42px;
   width: 320px;
-  max-height: 400px;
+  max-height: 450px;
   background: white;
   border-radius: 8px;
   padding: 10px 0;
@@ -168,6 +168,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   flex-direction: column;
   z-index: 20;
+  overflow-y: auto;
 }
 
 .emptyNotif {

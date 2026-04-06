@@ -17,7 +17,7 @@ const EmployeeFormModal = ({ isOpen, onClose, employee, onSuccess }) => {
     employmentType: 'Full-time',
     department: '',
     jobTitle: '',
-    hourlyRate: '',
+    hourlyRate: '18',
     salary: '',
   });
 

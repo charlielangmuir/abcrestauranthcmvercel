@@ -15,6 +15,19 @@ const Navbar = ({ toggleSidebar }) => {
   const notifRef = useRef(null);
 
   useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible' && user?.id) {
+      notificationService.getAllByUser(user.id)
+        .then(data => setNotifications(data))
+        .catch(console.error);
+    }
+  };
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user?.id]);
+
+  useEffect(() => {
   if (!user?.id) return;
 
   const fetchNotifications = async () => {
@@ -151,7 +164,7 @@ const Navbar = ({ toggleSidebar }) => {
                 {notifications.length === 0 ? (
                   <div className="emptyNotif">No notifications</div>
                 ) : (
-                  notifications.slice(0, 5).map((n, idx) => (
+                  notifications.slice(0, 4).map((n, idx) => (
                     <div key={n.notification_id}>
                       <div className="notifItem">
                         <div className="notifTitle">{n.title}</div>
