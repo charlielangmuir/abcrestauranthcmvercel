@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import ReimbursementForm from '../components/reimbursement/ReimbursementForm';
 import ReimbursementList from '../components/reimbursement/ReimbursementList';
+import { reimbursementService } from '../api/reimbursementService';
+import { employeeService } from '../api/employeeService';
+import toast from 'react-hot-toast';
 
 // Original helper — kept unchanged
 const getStatusStyle = (status) => {
@@ -29,15 +32,7 @@ const formatDate = (dateStr) => {
   });
 };
 
-const MOCK_DATA = [
-  { reimbursement_id: 1, description: 'Taxi fare to work', amount: 25.50, date: '2026-02-05', status: 'Pending',  category: 'Travel',    notes: null, employees: { users: { first_name: 'Alice', last_name: 'Wong' } } },
-  { reimbursement_id: 2, description: 'Uniform purchase',  amount: 89.99, date: '2026-02-03', status: 'Approved', category: 'Uniform',   notes: null, employees: { users: { first_name: 'Bob',   last_name: 'Smith' } } },
-  { reimbursement_id: 3, description: 'Parking fee',       amount: 15.00, date: '2026-02-01', status: 'Paid',     category: 'Travel',    notes: null, employees: { users: { first_name: 'Alice', last_name: 'Wong' } } },
-];
-
 const STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Paid', 'Rejected'];
-
-let nextId = 4;
 
 const ReimbursementsPage = () => {
   const { user } = useAuth();
@@ -45,28 +40,98 @@ const ReimbursementsPage = () => {
   const role = (user?.user_metadata?.role || 'EMPLOYEE').toString().toUpperCase();
   const isManager = ['MANAGER', 'ADMIN'].includes(role);
 
-  const [reimbursements, setReimbursements] = useState(MOCK_DATA);
+  const [reimbursements, setReimbursements] = useState([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [employeeId, setEmployeeId] = useState(null);
+  const [categories, setCategories] = useState([]);
 
-  const handleAdd = (formData) => {
-    const newItem = {
-      reimbursement_id: nextId++,
-      ...formData,
-      status: 'Pending',
-      employees: { users: { first_name: user?.user_metadata?.first_name || 'You', last_name: '' } },
+  const loadReimbursements = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+
+      if (isManager) {
+        const data = await reimbursementService.getAll();
+        setReimbursements(data);
+        return;
+      }
+
+      const employee = await employeeService.getByUserId(user.id);
+      setEmployeeId(employee.employee_id);
+      const data = await reimbursementService.getByEmployeeId(employee.employee_id);
+      setReimbursements(data);
+    } catch (error) {
+      console.error('Error loading reimbursements:', error);
+      toast.error(error.message || 'Failed to load reimbursements');
+      setReimbursements([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [isManager, user?.id]);
+
+  useEffect(() => {
+    loadReimbursements();
+  }, [loadReimbursements]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await reimbursementService.getCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error loading reimbursement categories:', error);
+      }
     };
-    setReimbursements((prev) => [newItem, ...prev]);
+
+    loadCategories();
+  }, []);
+
+  const handleAdd = async (formData) => {
+    try {
+      let resolvedEmployeeId = employeeId;
+
+      if (!resolvedEmployeeId) {
+        const employee = await employeeService.getByUserId(user.id);
+        resolvedEmployeeId = employee.employee_id;
+        setEmployeeId(employee.employee_id);
+      }
+
+      await reimbursementService.create({
+        ...formData,
+        employee_id: resolvedEmployeeId,
+        status: 'Pending',
+      });
+
+      await loadReimbursements();
+    } catch (error) {
+      console.error('Error creating reimbursement:', error);
+      throw error;
+    }
   };
 
-  const handleStatusChange = (id, newStatus) => {
-    setReimbursements((prev) =>
-      prev.map((r) => (r.reimbursement_id === id ? { ...r, status: newStatus } : r))
-    );
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await reimbursementService.updateStatus(id, newStatus);
+      await loadReimbursements();
+      toast.success(`Request marked ${newStatus.toLowerCase()}`);
+    } catch (error) {
+      console.error('Error updating reimbursement:', error);
+      toast.error(error.message || 'Failed to update reimbursement');
+    }
   };
 
-  const handleDelete = (id) => {
-    setReimbursements((prev) => prev.filter((r) => r.reimbursement_id !== id));
+  const handleDelete = async (id) => {
+    try {
+      await reimbursementService.delete(id);
+      await loadReimbursements();
+      toast.success('Request deleted');
+    } catch (error) {
+      console.error('Error deleting reimbursement:', error);
+      toast.error(error.message || 'Failed to delete reimbursement');
+    }
   };
 
   const totalRequested = reimbursements.reduce((sum, r) => sum + Number(r.amount || 0), 0);
@@ -129,12 +194,18 @@ const ReimbursementsPage = () => {
           </div>
         </div>
 
-        <ReimbursementList
-          items={filteredItems}
-          isManager={isManager}
-          onStatusChange={handleStatusChange}
-          onDelete={handleDelete}
-        />
+        {loading ? (
+          <div className="reimb-empty">
+            <div className="reimb-empty-title">Loading reimbursement requests...</div>
+          </div>
+        ) : (
+          <ReimbursementList
+            items={filteredItems}
+            isManager={isManager}
+            onStatusChange={handleStatusChange}
+            onDelete={handleDelete}
+          />
+        )}
       </div>
 
       {/* New request modal */}
@@ -142,6 +213,7 @@ const ReimbursementsPage = () => {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onAdd={handleAdd}
+        categories={categories}
       />
     </div>
   );
