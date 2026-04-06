@@ -19,7 +19,23 @@ export const shiftService = {
     try {
       const { data, error } = await supabase
         .from('shifts')
-        .select(`*, employees (${EMPLOYEE_SELECT})`)
+        .select(`
+          *,
+          employees (
+            employee_id,
+            employee_number,
+            job_title,
+            department,
+            hourly_rate,
+            salary,
+            users (
+              user_id,
+              first_name,
+              last_name,
+              email
+            )
+          )
+        `)
         .gte('shift_date', startDate)
         .lte('shift_date', endDate)
         .order('shift_date', { ascending: true })
@@ -41,7 +57,23 @@ export const shiftService = {
     try {
       const { data, error } = await supabase
         .from('shifts')
-        .select(`*, employees (${EMPLOYEE_SELECT})`)
+        .select(`
+          *,
+          employees (
+            employee_id,
+            employee_number,
+            job_title,
+            department,
+            hourly_rate,
+            salary,
+            users (
+              user_id,
+              first_name,
+              last_name,
+              email
+            )
+          )
+        `)
         .eq('shift_date', date)
         .order('start_time', { ascending: true });
 
@@ -79,7 +111,23 @@ export const shiftService = {
           notes: shiftData.notes || null,
           created_by: userData.user?.id || null,
         }])
-        .select(`*, employees (${EMPLOYEE_SELECT})`)
+        .select(`
+          *,
+          employees (
+            employee_id,
+            employee_number,
+            job_title,
+            department,
+            hourly_rate,
+            salary,
+            users (
+              user_id,
+              first_name,
+              last_name,
+              email
+            )
+          )
+        `)
         .single();
 
       if (error) throw error;
@@ -110,7 +158,23 @@ export const shiftService = {
         .from('shifts')
         .update(updateData)
         .eq('shift_id', shiftId)
-        .select(`*, employees (${EMPLOYEE_SELECT})`)
+        .select(`
+          *,
+          employees (
+            employee_id,
+            employee_number,
+            job_title,
+            department,
+            hourly_rate,
+            salary,
+            users (
+              user_id,
+              first_name,
+              last_name,
+              email
+            )
+          )
+        `)
         .single();
 
       if (error) throw error;

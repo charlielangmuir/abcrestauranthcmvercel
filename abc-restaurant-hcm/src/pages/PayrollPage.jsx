@@ -90,7 +90,11 @@ const PayrollPage = () => {
         const hours = getShiftHours(shift);
         if (hours <= 0) return;
 
-        const emp = (shift.employees) || employees.find((e) => e.employee_id === empId);
+        const fullEmployee = employees.find((e) => e.employee_id === empId);
+        const emp = {
+          ...(fullEmployee || {}),
+          ...(shift.employees || {}),
+        };
         const rawHourly = emp?.hourly_rate ?? emp?.hourlyRate ?? 0;
         const hourly = rawHourly ? parseFloat(rawHourly) : emp?.salary ? parseFloat(emp.salary) / 2080 : 0;
 

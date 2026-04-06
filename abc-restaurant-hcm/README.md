@@ -1,16 +1,160 @@
-# React + Vite
+# ABC Restaurant HCM Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ABC Restaurant HCM Frontend is a React + Vite web application for restaurant human capital management workflows. The application includes authentication, dashboard views, scheduling, employee availability, employee management, payroll, reimbursements, notifications, and profile management.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 18
+- Vite
+- React Router
+- Supabase
+- Axios
+- Material UI
+- Font Awesome
 
-## React Compiler
+## Main Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- User login with Supabase authentication
+- Role-based route protection
+- Dashboard for authenticated users
+- Employee availability management
+- Employee management for manager/admin roles
+- Payroll access for manager/finance/admin roles
+- Reimbursement tracking
+- Notifications
+- User profile management
+- Schedule creation and viewing
 
-## Expanding the ESLint configuration
+## Project Structure
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```text
+abc-restaurant-hcm/
+  public/
+  src/
+    api/
+    components/
+    context/
+    layouts/
+    pages/
+  index.html
+  package.json
+  vite.config.js
+```
+
+## Prerequisites
+
+Install the following before running the project:
+
+- Node.js 18 or later
+- npm 9 or later
+- Access to the team Supabase project
+- Required environment variables in `.env.development`
+
+## Environment Variables
+
+Create or update `abc-restaurant-hcm/.env.development` with valid values:
+
+```env
+VITE_API_URL=http://localhost:8080/api
+VITE_SUPABASE_URL=<your-supabase-project-url>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+```
+
+Notes:
+
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required for authentication and database access.
+- `VITE_API_URL` is used for the backend API when applicable.
+- This project currently uses Supabase client access in the frontend and also invokes Supabase Edge Functions for some employee actions.
+
+## Installation
+
+From the `abc-restaurant-hcm` folder:
+
+```bash
+npm install
+```
+
+## Run in Development
+
+```bash
+npm run dev
+```
+
+Vite will start a local development server. Open the local URL shown in the terminal, typically:
+
+```text
+http://localhost:5173
+```
+
+## Build for Production
+
+```bash
+npm run build
+```
+
+## Preview Production Build
+
+```bash
+npm run preview
+```
+
+## Authentication and Login
+
+- Users must log in with valid credentials that exist in the connected Supabase Auth project.
+- Access to some pages depends on the authenticated user's role.
+- If your instructor needs login access, provide one or more test accounts in the separate submission document.
+
+Recommended accounts to provide in the separate submission document:
+
+- Admin account
+- Manager account
+- Employee account
+
+For each account, include:
+
+- Email
+- Password
+- Role
+- Any notes needed for testing
+
+## Important Routes
+
+- `/login`
+- `/dashboard`
+- `/schedule`
+- `/availability`
+- `/employees`
+- `/payroll`
+- `/reimbursements`
+- `/profile`
+- `/view-schedule`
+- `/notifications`
+
+## Known Setup Notes
+
+- The project depends on Supabase configuration being available at runtime.
+- Some employee management actions invoke Supabase Edge Functions such as `Create-Employee` and `update-employee`.
+- If those functions or related backend resources are not deployed in the target environment, some features will not work.
+
+## Submission Notes
+
+For final submission, include:
+
+- Source code repository link
+- Compressed final source code folder
+- Separate README `.docx` with run instructions and login details
+- Project Closure Report
+- Minutes of Meeting after Sprint 7
+
+Suggested compressed source folder name format:
+
+```text
+W26_T<team#>_ABC_Restaurant_HCM
+```
+
+## Scripts
+
+- `npm run dev` - start development server
+- `npm run build` - create production build
+- `npm run preview` - preview production build
+- `npm run lint` - run ESLint
