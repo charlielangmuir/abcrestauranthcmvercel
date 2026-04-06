@@ -1,16 +1,47 @@
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { supabase } from '../../api/supabaseClient';
 import { useState, useEffect, useRef } from 'react';
+import { notificationService } from '../../api/notificationService';
 
 const Navbar = ({ toggleSidebar }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [openNotif, setOpenNotif] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
-  // Ref for notification wrapper (bell + popout)
   const notifRef = useRef(null);
+
+  useEffect(() => {
+  if (!user?.id) return;
+
+  const fetchNotifications = async () => {
+    try {
+      const data = await notificationService.getAllByUser(user.id);
+      setNotifications(data);
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    }
+  };
+
+  fetchNotifications();
+
+  const channel = supabase
+    .channel('user-notifications')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
+      filter: `user_id=eq.${user.id}`
+    }, (payload) => {
+      setNotifications(prev => [payload.new, ...prev]);
+    })
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
+}, [user?.id]);
 
   // --- Click Outside Handler ---
   useEffect(() => {
@@ -31,30 +62,8 @@ const Navbar = ({ toggleSidebar }) => {
     };
   }, [openNotif]);
 
-  // --- Dummy notifications for UI demo ---
-  const dummyNotifications = [
-    {
-      id: 1,
-      title: "New Schedule Posted",
-      message: "Your shift for next week is now available.",
-      sent_at: new Date(Date.now() - 1000 * 60 * 10)
-    },
-    {
-      id: 2,
-      title: "Manager Update",
-      message: "Please review the updated kitchen procedures.",
-      sent_at: new Date(Date.now() - 1000 * 60 * 60)
-    },
-    {
-      id: 3,
-      title: "System Notice",
-      message: "Maintenance scheduled for tonight at 2 AM.",
-      sent_at: new Date(Date.now() - 1000 * 60 * 90)
-    }
-  ];
-
-  const timeSince = (date) => {
-    const diff = (Date.now() - date.getTime()) / 1000;
+  const timeSince = (dateStr) => {
+    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
     if (diff < 60) return `${Math.floor(diff)}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -115,17 +124,17 @@ const Navbar = ({ toggleSidebar }) => {
 
             {openNotif && (
               <div className="notifList">
-                {dummyNotifications.length === 0 ? (
+                {notifications.length === 0 ? (
                   <div className="emptyNotif">No notifications</div>
                 ) : (
-                  dummyNotifications.slice(0, 5).map((n, idx) => (
-                    <div key={n.id}>
+                  notifications.slice(0, 5).map((n, idx) => (
+                    <div key={n.notification_id}>
                       <div className="notifItem">
                         <div className="notifTitle">{n.title}</div>
                         <div className="notifMsg">{n.message}</div>
                         <div className="notifTime">{timeSince(n.sent_at)}</div>
                       </div>
-                      {idx < dummyNotifications.length - 1 && (
+                      {idx < notifications.slice(0, 5).length - 1 && (
                         <div className="notifDivider"></div>
                       )}
                     </div>
