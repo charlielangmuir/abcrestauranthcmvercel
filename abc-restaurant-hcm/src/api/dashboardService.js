@@ -61,31 +61,47 @@ export const dashboardService = {
     }
   },
 
-  async getEmployeeStats(userId) {
+  async getEmployeeStats(userId, userRole = 'EMPLOYEE') {
     try {
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('employee_id')
-        .eq('user_id', userId)
-        .single();
+      const role = (userRole || 'EMPLOYEE').toString().toUpperCase();
+      const isManagerView = ['MANAGER', 'FINANCE', 'ADMIN'].includes(role);
+      let employeeId = null;
 
-      if (employeeError) {
-        console.error('Error fetching employee:', employeeError);
-        throw employeeError;
+      if (!isManagerView) {
+        const { data: employeeData, error: employeeError } = await supabase
+          .from('employees')
+          .select('employee_id')
+          .eq('user_id', userId)
+          .single();
+
+        if (employeeError) {
+          console.error('Error fetching employee:', employeeError);
+          throw employeeError;
+        }
+
+        if (!employeeData) {
+          console.warn('No employee record found for user');
+          return {
+            upcomingShifts: 0,
+            hoursThisWeek: 0,
+            pendingRequests: 0,
+            unreadNotifications: 0,
+            recentShifts: [],
+          };
+        }
+
+        employeeId = employeeData.employee_id;
+      } else {
+        const { data: employeeData, error: employeeError } = await supabase
+          .from('employees')
+          .select('employee_id')
+          .eq('user_id', userId)
+          .single();
+
+        if (!employeeError && employeeData) {
+          employeeId = employeeData.employee_id;
+        }
       }
-
-      if (!employeeData) {
-        console.warn('No employee record found for user');
-        return {
-          upcomingShifts: 0,
-          hoursThisWeek: 0,
-          pendingRequests: 0,
-          unreadNotifications: 0,
-          recentShifts: [],
-        };
-      }
-
-      const employeeId = employeeData.employee_id;
 
       const today = new Date();
       const todayStr = formatDate(today);
@@ -141,17 +157,37 @@ export const dashboardService = {
 
       let pendingRequests = 0;
       try {
-        const { error: requestsError, count } = await supabase
+        let timeOffCount = 0;
+        let reimbursementCount = 0;
+
+        const timeOffQuery = supabase
           .from('time_off_requests')
           .select('*', { count: 'exact' })
-          .eq('employee_id', employeeId)
           .eq('status', 'pending');
 
-        if (!requestsError) {
-          pendingRequests = count || 0;
+        const reimburseQuery = supabase
+          .from('reimbursement_requests')
+          .select('*', { count: 'exact' })
+          .eq('status', 'pending');
+
+        if (!isManagerView) {
+          timeOffQuery.eq('employee_id', employeeId);
+          reimburseQuery.eq('employee_id', employeeId);
         }
+
+        const { error: timeOffError, count: timeOffCountRaw } = await timeOffQuery;
+        if (!timeOffError) {
+          timeOffCount = timeOffCountRaw || 0;
+        }
+
+        const { error: reimburseError, count: reimburseCountRaw } = await reimburseQuery;
+        if (!reimburseError) {
+          reimbursementCount = reimburseCountRaw || 0;
+        }
+
+        pendingRequests = timeOffCount + reimbursementCount;
       } catch (error) {
-        console.warn('Time off requests table may not exist yet');
+        console.warn('Pending requests tables may not exist yet');
       }
 
       let unreadNotifications = 0;

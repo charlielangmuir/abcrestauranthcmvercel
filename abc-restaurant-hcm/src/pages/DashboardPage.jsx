@@ -79,7 +79,7 @@ const DashboardPage = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const data = await dashboardService.getEmployeeStats(user.id);
+      const data = await dashboardService.getEmployeeStats(user.id, role);
       setStats(data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
