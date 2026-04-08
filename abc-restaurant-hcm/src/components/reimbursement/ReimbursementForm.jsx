@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 
 const FALLBACK_CATEGORIES = ['Meals', 'Transportation', 'Supplies', 'Uniform', 'Training', 'Other'];
 
 const ReimbursementForm = ({ isOpen, onClose, onAdd, categories = [] }) => {
   const today = new Date().toISOString().split('T')[0];
-  const availableCategories = categories.length > 0
-    ? categories.map((item) => item.category_name)
-    : FALLBACK_CATEGORIES;
+  const availableCategories = useMemo(() =>
+    categories.length > 0
+      ? categories.map((item) => item.category_name)
+      : FALLBACK_CATEGORIES,
+    [categories]
+  );
 
   const [formData, setFormData] = useState({
     description: '',
