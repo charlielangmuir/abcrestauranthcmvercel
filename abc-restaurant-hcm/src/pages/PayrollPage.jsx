@@ -1,15 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { employeeService } from '../api/employeeService';
-import { shiftService } from '../api/shiftService';
+import { payrollService } from '../api/payrollService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-
-const parseTimeToMinutes = (time) => {
-  if (!time) return 0;
-  const [h, m] = time.split(':').map((n) => Number(n));
-  return h * 60 + m;
-};
 
 const formatCurrency = (amount) => {
   return '$' + Number(amount || 0).toFixed(2);
@@ -20,30 +13,10 @@ const formatDate = (date) => {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const hoursFromShift = (shift) => {
-  const startMin = parseTimeToMinutes(shift.start_time);
-  const endMin = parseTimeToMinutes(shift.end_time);
-  if (isNaN(startMin) || isNaN(endMin) || endMin <= startMin) return 0;
-  const breakMin = Number(shift.break_duration || 0);
-  return Math.max(0, (endMin - startMin - breakMin) / 60);
-};
-
-const getShiftHours = (shift) => {
-  // Prefer explicit actual hours if available, otherwise calculate from start/end times.
-  if (shift.actual_hours !== undefined && shift.actual_hours !== null) {
-    const actual = Number(shift.actual_hours);
-    return isNaN(actual) ? 0 : actual;
-  }
-
-  if (shift.actual_start_time && shift.actual_end_time) {
-    return hoursFromShift({
-      start_time: shift.actual_start_time,
-      end_time: shift.actual_end_time,
-      break_duration: shift.break_duration,
-    });
-  }
-
-  return hoursFromShift(shift);
+const formatHours = (decimalHours) => {
+  const hours = Math.floor(decimalHours);
+  const minutes = Math.round((decimalHours - hours) * 60);
+  return `${hours}h ${minutes}m`;
 };
 
 const PayrollPage = () => {
@@ -80,50 +53,7 @@ const PayrollPage = () => {
       }
 
       const period = getPeriodRange();
-      const employees = await employeeService.getAll(true);
-      const shifts = await shiftService.getShiftsByDateRange(period.startDate, period.endDate);
-
-      const earningsByEmployee = {};
-
-      shifts.forEach((shift) => {
-        const empId = shift.employee_id;
-        if (!empId) return;
-        const hours = getShiftHours(shift);
-        if (hours <= 0) return;
-
-        const fullEmployee = employees.find((e) => e.employee_id === empId);
-        const emp = {
-          ...(fullEmployee || {}),
-          ...(shift.employees || {}),
-        };
-        const rawHourly = emp?.hourly_rate ?? emp?.hourlyRate ?? 0;
-        const hourly = rawHourly ? parseFloat(rawHourly) : emp?.salary ? parseFloat(emp.salary) / 2080 : 0;
-
-        const wage = hours * (isNaN(hourly) ? 0 : hourly);
-
-        if (!earningsByEmployee[empId]) {
-          earningsByEmployee[empId] = {
-            employeeId: empId,
-            name: `${emp?.users?.first_name || 'Unknown'} ${emp?.users?.last_name || ''}`.trim() || 'Unknown',
-            department: emp?.department || '—',
-            hourlyRate: hourly,
-            hourlyLimit: emp?.hourly_limit ?? emp?.hourlyLimit ?? 0,
-            totalHours: 0,
-            totalPay: 0,
-          };
-        }
-
-        earningsByEmployee[empId].totalHours += hours;
-        earningsByEmployee[empId].totalPay += wage;
-      });
-
-      const records = Object.values(earningsByEmployee)
-        .map((r) => ({
-          ...r,
-          totalHours: Number(r.totalHours.toFixed(2)),
-          totalPay: Number(r.totalPay.toFixed(2)),
-        }))
-        .sort((a, b) => b.totalPay - a.totalPay);
+      const records = await payrollService.calculatePayrollFromTimeLogs(period.startDate, period.endDate);
 
       const totalPayroll = records.reduce((sum, rec) => sum + rec.totalPay, 0);
       const employeesPaid = records.filter((rec) => rec.totalPay > 0).length;
@@ -157,22 +87,20 @@ const PayrollPage = () => {
     // Build worksheet data
     const period = getPeriodRange();
 
-    const headers = ['Employee', 'Department', 'Hours Worked', 'Hourly Rate', 'Hourly Limit', 'Net Pay'];
+    const headers = ['Employee', 'Department', 'Hours Worked', 'Hourly Rate', 'Net Pay'];
 
     const rows = payrollRecords.map((rec) => [
       rec.name,
       rec.department,
-      rec.totalHours,
+      formatHours(rec.totalHours),
       rec.hourlyRate,
-      rec.hourlyLimit || 0,
       rec.totalPay,
     ]);
 
     const totalsRow = [
       'TOTAL',
       '',
-      payrollRecords.reduce((sum, r) => sum + r.totalHours, 0).toFixed(2),
-      '',
+      formatHours(payrollRecords.reduce((sum, r) => sum + r.totalHours, 0)),
       '',
       payrollRecords.reduce((sum, r) => sum + r.totalPay, 0).toFixed(2),
     ];
@@ -186,7 +114,6 @@ const PayrollPage = () => {
       { wch: 18 }, // Department
       { wch: 14 }, // Hours
       { wch: 14 }, // Rate
-      { wch: 14 }, // Hourly Limit
       { wch: 14 }, // Net Pay
     ];
 
@@ -238,7 +165,7 @@ const PayrollPage = () => {
           <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 700 }}>Total Payroll (This Month)</div>
           <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8 }}>{formatCurrency(payrollSummary.totalPayroll)}</div>
           <div style={{ fontSize: 13, color: '#16a34a', fontWeight: 600, marginTop: 6 }}>
-            {payrollSummary.totalPayroll >= 0 ? 'Calculated from shifts' : ''}
+            {payrollSummary.totalPayroll >= 0 ? 'Calculated from time logs' : ''}
           </div>
         </div>
 
@@ -289,7 +216,6 @@ const PayrollPage = () => {
                   <th style={{ textAlign: 'left', padding: 10, borderBottom: '1px solid #ddd' }}>Employee</th>
                   <th style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #ddd' }}>Hours</th>
                   <th style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #ddd' }}>Rate</th>
-                  <th style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #ddd' }}>Hourly Limit</th>
                   <th style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #ddd' }}>Net Pay</th>
                 </tr>
               </thead>
@@ -297,9 +223,8 @@ const PayrollPage = () => {
                 {payrollRecords.map((rec) => (
                   <tr key={rec.employeeId}>
                     <td style={{ padding: 10, borderBottom: '1px solid #f3f3f3' }}>{rec.name || `ID:${rec.employeeId}`}</td>
-                    <td style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #f3f3f3' }}>{rec.totalHours}</td>
+                    <td style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #f3f3f3' }}>{formatHours(rec.totalHours)}</td>
                     <td style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #f3f3f3' }}>{formatCurrency(rec.hourlyRate)}</td>
-                    <td style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #f3f3f3' }}>{rec.hourlyLimit ? `${rec.hourlyLimit} h` : '—'}</td>
                     <td style={{ textAlign: 'right', padding: 10, borderBottom: '1px solid #f3f3f3', fontWeight: 700 }}>{formatCurrency(rec.totalPay)}</td>
                   </tr>
                 ))}

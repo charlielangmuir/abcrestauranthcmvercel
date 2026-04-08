@@ -250,10 +250,23 @@ export const dashboardService = {
 
   async getClockStatus(userId) {
     try {
-      const { data, error } = await supabase
-        .from('time_logs')
-        .select('id, user_id, clock_in, clock_out, created_at')
+      // Get the employee_id for this user first
+      const { data: employeeData, error: empError } = await supabase
+        .from('employees')
+        .select('employee_id')
         .eq('user_id', userId)
+        .single();
+
+      if (empError || !employeeData) {
+        return { isClockedIn: false, activeEntry: null, lastClockOut: null };
+      }
+
+      const employeeId = employeeData.employee_id;
+
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select('entry_id, employee_id, clock_in, clock_out, created_at')
+        .eq('employee_id', employeeId)
         .is('clock_out', null)
         .order('clock_in', { ascending: false })
         .limit(1)
@@ -265,9 +278,9 @@ export const dashboardService = {
       }
 
       const { data: lastEntry, error: lastEntryError } = await supabase
-        .from('time_logs')
+        .from('time_entries')
         .select('clock_out')
-        .eq('user_id', userId)
+        .eq('employee_id', employeeId)
         .not('clock_out', 'is', null)
         .order('clock_out', { ascending: false })
         .limit(1)
@@ -290,10 +303,23 @@ export const dashboardService = {
 
   async clockIn(userId) {
     try {
-      const { data: existingEntry, error: existingError } = await supabase
-        .from('time_logs')
-        .select('id')
+      // Get the employee_id for this user
+      const { data: employeeData, error: empError } = await supabase
+        .from('employees')
+        .select('employee_id')
         .eq('user_id', userId)
+        .single();
+
+      if (empError || !employeeData) {
+        throw empError || new Error('Employee record not found');
+      }
+
+      const employeeId = employeeData.employee_id;
+
+      const { data: existingEntry, error: existingError } = await supabase
+        .from('time_entries')
+        .select('entry_id')
+        .eq('employee_id', employeeId)
         .is('clock_out', null)
         .limit(1)
         .maybeSingle();
@@ -307,10 +333,10 @@ export const dashboardService = {
       }
 
       const { data, error } = await supabase
-        .from('time_logs')
+        .from('time_entries')
         .insert([
           {
-            user_id: userId,
+            employee_id: employeeId,
             clock_in: new Date().toISOString(),
           },
         ])
@@ -330,10 +356,23 @@ export const dashboardService = {
 
   async clockOut(userId) {
     try {
-      const { data: activeEntry, error: fetchError } = await supabase
-        .from('time_logs')
-        .select('id')
+      // Get the employee_id for this user
+      const { data: employeeData, error: empError } = await supabase
+        .from('employees')
+        .select('employee_id')
         .eq('user_id', userId)
+        .single();
+
+      if (empError || !employeeData) {
+        throw empError || new Error('Employee record not found');
+      }
+
+      const employeeId = employeeData.employee_id;
+
+      const { data: activeEntry, error: fetchError } = await supabase
+        .from('time_entries')
+        .select('entry_id')
+        .eq('employee_id', employeeId)
         .is('clock_out', null)
         .order('clock_in', { ascending: false })
         .limit(1)
@@ -348,11 +387,11 @@ export const dashboardService = {
       }
 
       const { data, error } = await supabase
-        .from('time_logs')
+        .from('time_entries')
         .update({
           clock_out: new Date().toISOString(),
         })
-        .eq('id', activeEntry.id)
+        .eq('entry_id', activeEntry.entry_id)
         .select()
         .single();
 
