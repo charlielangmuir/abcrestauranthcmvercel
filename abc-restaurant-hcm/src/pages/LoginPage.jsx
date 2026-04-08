@@ -156,7 +156,7 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <div style={{ marginTop: 20, textAlign: 'center' }}>
+        {/*<div style={{ marginTop: 20, textAlign: 'center' }}>
           <a 
             href="#" 
             className="subtle"
@@ -172,6 +172,7 @@ const LoginPage = () => {
             Forgot password?
           </a>
         </div>
+        */}
       </div>
 
       <style>{`
