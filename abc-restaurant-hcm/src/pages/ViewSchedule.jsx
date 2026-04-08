@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { dashboardService } from '../api/dashboardService';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const ViewSchedule = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const calendarCaptureRef = useRef(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [timeOffRequests, setTimeOffRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [showDayModal, setShowDayModal] = useState(false);
 
@@ -195,6 +199,145 @@ const ViewSchedule = () => {
     return 'No shift scheduled';
   };
 
+  const handleDownload = async () => {
+    if (pdfLoading) return;
+
+    const toastId = toast.loading('Generating schedule PDF...');
+    setPdfLoading(true);
+
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      let y = margin;
+
+      const monthLabel = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+      const employeeName = user?.user_metadata?.full_name || user?.email || 'Employee';
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('ABC Restaurant HCM - Monthly Schedule', margin, y);
+      y += 24;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.text(`Employee: ${employeeName}`, margin, y);
+      y += 18;
+      doc.text(`Month: ${monthLabel}`, margin, y);
+      y += 18;
+      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
+      y += 24;
+
+      const nextShift = getNextShift();
+      const summaryLines = [
+        `Shift today: ${loading ? 'Loading...' : getTodayShift()}`,
+        `Next shift: ${nextShift ? `${formatDate(new Date(nextShift.shift_date))} ${formatTime(nextShift.start_time)}-${formatTime(nextShift.end_time)}${nextShift.position ? ` (${nextShift.position})` : ''}` : 'No upcoming shifts'}`,
+        `Shifts this month: ${loading ? '...' : countShiftsInMonth()}`,
+      ];
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary', margin, y);
+      y += 16;
+      doc.setFont('helvetica', 'normal');
+      summaryLines.forEach((line) => {
+        doc.text(line, margin, y);
+        y += 16;
+      });
+      y += 8;
+
+      const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthShifts = shifts
+        .filter((shift) => shift.shift_date?.startsWith(monthKey))
+        .sort((a, b) => a.shift_date.localeCompare(b.shift_date) || a.start_time.localeCompare(b.start_time));
+
+      const monthTimeOff = timeOffRequests
+        .filter((request) => request.start_date?.startsWith(monthKey) || request.end_date?.startsWith(monthKey))
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+      const ensureSpace = (requiredHeight) => {
+        if (y + requiredHeight > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+      };
+
+      doc.setFont('helvetica', 'bold');
+      ensureSpace(20);
+      doc.text('Shifts', margin, y);
+      y += 16;
+      doc.setFont('helvetica', 'normal');
+
+      if (monthShifts.length === 0) {
+        doc.text('No shifts scheduled this month.', margin, y);
+        y += 18;
+      } else {
+        monthShifts.forEach((shift, index) => {
+          ensureSpace(18);
+          const line = `${index + 1}. ${formatDate(new Date(shift.shift_date))} | ${formatTime(shift.start_time)}-${formatTime(shift.end_time)}${shift.position ? ` | ${shift.position}` : ''}`;
+          doc.text(line, margin, y);
+          y += 16;
+        });
+      }
+
+      y += 10;
+      doc.setFont('helvetica', 'bold');
+      ensureSpace(20);
+      doc.text('Time Off', margin, y);
+      y += 16;
+      doc.setFont('helvetica', 'normal');
+
+      if (monthTimeOff.length === 0) {
+        doc.text('No time-off entries this month.', margin, y);
+        y += 18;
+      } else {
+        monthTimeOff.forEach((request, index) => {
+          ensureSpace(32);
+          const status = request.status ? request.status.charAt(0).toUpperCase() + request.status.slice(1) : 'Unknown';
+          const line = `${index + 1}. ${request.start_date} to ${request.end_date} | ${status}`;
+          doc.text(line, margin, y);
+          y += 14;
+          if (request.reason) {
+            const reasonLines = doc.splitTextToSize(`Reason: ${request.reason}`, pageWidth - margin * 2);
+            reasonLines.forEach((reasonLine) => {
+              ensureSpace(14);
+              doc.text(reasonLine, margin + 12, y);
+              y += 14;
+            });
+          }
+          y += 4;
+        });
+      }
+
+      if (calendarCaptureRef.current) {
+        const canvas = await html2canvas(calendarCaptureRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          useCORS: true,
+        });
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = pageWidth - margin * 2;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        ensureSpace(imgHeight + 30);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Calendar View', margin, y);
+        y += 12;
+        doc.addImage(imgData, 'PNG', margin, y, imgWidth, imgHeight);
+      }
+
+      const fileName = `schedule-${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}.pdf`;
+      doc.save(fileName);
+      toast.success('Schedule PDF downloaded');
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      toast.error('Failed to generate PDF. Please try again.');
+    } finally {
+      toast.dismiss(toastId);
+      setPdfLoading(false);
+    }
+  };
+
   return (
     <div className="schedule-page">
       <div className="schedule-container">
@@ -245,7 +388,7 @@ const ViewSchedule = () => {
               </div>
             </div>
 
-            <div className="schedule-calendar-section">
+            <div className="schedule-calendar-section" ref={calendarCaptureRef}>
               <div className="schedule-calendar-header">
                 <h2 className="schedule-calendar-title">
                   {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
@@ -329,20 +472,23 @@ const ViewSchedule = () => {
                 </div>
               </div>
 
-              <div className="schedule-action-buttons">
-                <button 
-                  className="schedule-action-btn"
-                  onClick={() => toast.info('PDF download coming soon')}
-                >
-                  Download PDF
-                </button>
-                <button 
-                  className="schedule-action-btn"
-                  onClick={() => navigate('/availability')}
-                >
-                  Check Availability
-                </button>
-              </div>
+                <div className="schedule-action-buttons">
+                  <button 
+                    className="schedule-action-btn"
+                    type="button"
+                    onClick={handleDownload}
+                    disabled={pdfLoading}
+                  >
+                    {pdfLoading ? 'Generating PDF...' : 'Download PDF'}
+                  </button>
+                  <button 
+                    className="schedule-action-btn"
+                    type="button"
+                    onClick={() => navigate('/availability')}
+                  >
+                    Check Availability
+                  </button>
+                </div>
             </div>
           </div>
         </div>

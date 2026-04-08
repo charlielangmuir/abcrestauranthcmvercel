@@ -21,6 +21,40 @@ const normalizeReimbursement = (item) => ({
   status: formatStatus(item?.status),
 });
 
+const deleteReimbursement = async (id) => {
+  if (!id) {
+    throw new Error('Missing reimbursement ID for delete');
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from(REQUESTS_TABLE)
+    .select('reimbursement_id')
+    .eq('reimbursement_id', id)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  if (!existing) {
+    throw new Error(`Reimbursement request not found for id ${id}`);
+  }
+
+  const { data, error } = await supabase
+    .from(REQUESTS_TABLE)
+    .delete()
+    .eq('reimbursement_id', id)
+    .select('reimbursement_id');
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error(`Reimbursement request could not be deleted for id ${id}`);
+  }
+};
+
 export const reimbursementService = {
   getCategories: async () => {
     const { data, error } = await supabase
@@ -142,12 +176,6 @@ export const reimbursementService = {
     return normalizeReimbursement(data);
   },
 
-  delete: async (id) => {
-    const { error } = await supabase
-      .from(REQUESTS_TABLE)
-      .delete()
-      .eq('reimbursement_id', id);
-
-    if (error) throw error;
-  },
+  deleteRequest: deleteReimbursement,
+  delete: deleteReimbursement,
 };
