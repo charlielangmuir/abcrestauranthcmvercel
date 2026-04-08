@@ -38,7 +38,7 @@ const LoginPage = () => {
       gap: 24
     }}>
       <img 
-        src="../../public/android-chrome-192x192.png" 
+        src="/android-chrome-192x192.png" 
         alt="ABC Restaurant Logo" 
         style={{
           width: 120,
