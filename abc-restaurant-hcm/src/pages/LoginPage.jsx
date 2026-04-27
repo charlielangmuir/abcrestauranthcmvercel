@@ -54,6 +54,9 @@ const LoginPage = () => {
             ABC Restaurant HCM
           </h1>
           <p className="subtle">Sign in to your account</p>
+          <p className="sublte">*Credentials For Demo*</p>
+          <p className="sublte">Admin: admin@abcdemo.com | password</p>
+          <p className="sublte">Employee: employee@abcdemo.com | password</p>
         </div>
         
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
